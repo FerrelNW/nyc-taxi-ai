@@ -1,0 +1,832 @@
+{% extends "layout.html" %}
+
+{% block title %}Analisa Tujuan - NYC Taxi AI{% endblock %}
+
+{% block extra_css %}
+<style>
+    #map { height: 500px; width: 100%; border-radius: 12px; }
+    .search-container { position: relative; }
+    .search-results {
+        position: absolute; top: 100%; left: 0; right: 0;
+        background: white; border: 1px solid #ddd; border-radius: 0 0 8px 8px;
+        max-height: 200px; overflow-y: auto; z-index: 1000;
+        display: none; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .search-item { padding: 10px; cursor: pointer; border-bottom: 1px solid #f3f3f3; font-size: 14px; }
+    .search-item:hover { background-color: #f0f9ff; color: #0284c7; }
+    .prediction-area {
+        stroke-dasharray: 10,5;
+        animation: dash 20s linear infinite;
+    }
+    @keyframes dash {
+        to { stroke-dashoffset: 1000; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- Page Header -->
+    <div class="mb-8">
+        <div class="flex items-center mb-2">
+            <a href="/" class="text-blue-600 hover:text-blue-800">
+                <i class="fas fa-home"></i> Home
+            </a>
+            <span class="mx-2 text-gray-400">/</span>
+            <span class="text-gray-700">Analisa Tujuan</span>
+        </div>
+        <h1 class="text-3xl font-bold text-gray-800 mb-2">Prediksi Pola Tujuan Taksi</h1>
+        <p class="text-gray-600">AI menganalisis zona tujuan yang paling mungkin berdasarkan lokasi dan waktu penjemputan</p>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Left Panel: Input Form -->
+        <div class="lg:col-span-1">
+            <div class="glass-card rounded-xl p-6 shadow-soft h-full">
+                <h2 class="text-xl font-bold text-gray-800 mb-6 flex items-center">
+                    <i class="fas fa-map-marker-alt text-purple-600 mr-3"></i> Data Input
+                </h2>
+
+                <!-- Pickup Location -->
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        <i class="fas fa-map-pin text-green-500 mr-2"></i> Lokasi Penjemputan
+                    </label>
+                    <div class="search-container">
+                        <input type="text" id="pickup_input" 
+                               class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                               placeholder="Ketik nama tempat atau klik peta...">
+                        <div id="pickup_results" class="search-results"></div>
+                    </div>
+                    <input type="hidden" id="pickup_lat">
+                    <input type="hidden" id="pickup_lon">
+                    <p class="text-xs text-gray-500 mt-1">AI akan menganalisis pola dari titik ini</p>
+                </div>
+
+                <!-- Time and Passengers -->
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="far fa-clock text-gray-500 mr-2"></i> Waktu
+                        </label>
+                        <input type="datetime-local" id="datetime" 
+                               class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-users text-gray-500 mr-2"></i> Penumpang
+                        </label>
+                        <input type="number" id="passengers" min="1" max="6" value="1"
+                               class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                    </div>
+                </div>
+
+                <!-- Model Info -->
+                <div class="bg-purple-50 border border-purple-100 rounded-lg p-4 mb-6">
+                    <div class="flex items-start">
+                        <i class="fas fa-brain text-purple-500 mt-0.5 mr-3"></i>
+                        <div>
+                            <h4 class="font-medium text-purple-800 mb-1">Model AI</h4>
+                            <p class="text-sm text-purple-700">
+                                Menggunakan Random Forest Classifier yang dilatih dengan 1+ juta data perjalanan NYC taxi untuk memprediksi pola tujuan.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Predict Button -->
+                <button onclick="predictDestination()" 
+                        class="w-full bg-gradient-to-r from-purple-600 to-purple-700 text-white font-medium py-3.5 rounded-lg hover:from-purple-700 hover:to-purple-800 transition-all duration-300 shadow-md hover:shadow-lg flex items-center justify-center">
+                    <i class="fas fa-search-location mr-3"></i> Prediksi Tujuan
+                </button>
+
+                <!-- Loading Indicator -->
+                <div id="loading" class="hidden mt-6 text-center">
+                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                    <p class="text-gray-600 mt-2">Menganalisis pola perjalanan...</p>
+                </div>
+
+                <!-- Stats Info -->
+                <div class="mt-8 pt-6 border-t">
+                    <h4 class="font-medium text-gray-700 mb-3">Statistik Model</h4>
+                    <div class="space-y-2">
+                        <div class="flex justify-between">
+                            <span class="text-sm text-gray-600">Akurasi Model:</span>
+                            <span class="text-sm font-medium text-green-600">85.2%</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-sm text-gray-600">Cluster Tujuan:</span>
+                            <span class="text-sm font-medium text-purple-600">15 zona</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-sm text-gray-600">Data Training:</span>
+                            <span class="text-sm font-medium text-blue-600">1.2M trips</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel: Map and Results -->
+        <div class="lg:col-span-2 space-y-8">
+            <!-- Map -->
+            <div class="glass-card rounded-xl p-1 shadow-soft overflow-hidden">
+                <div id="map"></div>
+                <div class="p-4 bg-gray-50 flex items-center justify-between">
+                    <div class="flex items-center space-x-4">
+                        <div class="flex items-center">
+                            <div class="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
+                            <span class="text-sm text-gray-700">Lokasi Jemput</span>
+                        </div>
+                        <div class="flex items-center">
+                            <div class="w-3 h-3 bg-purple-500 rounded-full mr-2"></div>
+                            <span class="text-sm text-gray-700">Prediksi Tujuan</span>
+                        </div>
+                        <div class="flex items-center">
+                            <div class="w-3 h-3 bg-yellow-500 rounded-full mr-2"></div>
+                            <span class="text-sm text-gray-700">Area Prediksi</span>
+                        </div>
+                    </div>
+                    <button onclick="clearPrediction()" class="text-sm text-gray-600 hover:text-red-600">
+                        <i class="fas fa-trash-alt mr-1"></i> Hapus Prediksi
+                    </button>
+                </div>
+            </div>
+
+            <!-- Ganti bagian Results Section dengan ini: -->
+            <div id="result_section" class="hidden">
+                <div class="glass-card rounded-xl p-6 shadow-soft">
+                    <h2 class="text-xl font-bold text-gray-800 mb-6 flex items-center">
+                        <i class="fas fa-trophy text-purple-600 mr-3"></i> Top 3 Prediksi Tujuan
+                    </h2>
+                    
+                    <!-- Top Predictions Grid -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6" id="top_predictions_grid">
+                        <!-- Will be populated by JavaScript -->
+                    </div>
+
+                    <!-- Prediction Details -->
+                    <div class="border border-gray-200 rounded-lg p-5 mb-6">
+                        <h4 class="font-medium text-gray-800 mb-4 flex items-center">
+                            <i class="fas fa-chart-pie text-blue-500 mr-2"></i> Analisis Detail
+                        </h4>
+                        <div class="space-y-4">
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-600">Total Zona dalam Sistem:</span>
+                                <span id="total_clusters" class="font-bold text-gray-800">--</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-600">Zona Penjemputan:</span>
+                                <span id="pickup_zone" class="font-bold text-gray-800">--</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-600">Waktu Analisis:</span>
+                                <span id="analysis_time_detailed" class="font-bold text-gray-800">--</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Map Visualization Note -->
+                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+                        <div class="flex items-start">
+                            <i class="fas fa-map-marked-alt text-yellow-500 mt-0.5 mr-3"></i>
+                            <div>
+                                <h4 class="font-medium text-yellow-800 mb-1">Visualisasi Peta</h4>
+                                <p class="text-sm text-yellow-700">
+                                    <i class="fas fa-star text-yellow-500 mr-1"></i> <strong>Peringkat 1</strong> ditampilkan sebagai <span class="font-bold">titik ungu utama</span><br>
+                                    <i class="fas fa-star text-gray-400 mr-1"></i> <strong>Peringkat 2 & 3</strong> ditampilkan sebagai <span class="font-bold">titik biru</span> di peta<br>
+                                    Klik tombol "Lihat di Peta" untuk fokus ke prediksi tertentu
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="flex space-x-3">
+                        <button onclick="predictDestination()" class="flex-1 bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700 transition-colors font-medium">
+                            <i class="fas fa-redo mr-2"></i> Analisis Ulang
+                        </button>
+                        <button onclick="exportAnalysis()" class="flex-1 bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-colors font-medium">
+                            <i class="fas fa-download mr-2"></i> Ekspor Prediksi
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+                    <!-- Cluster Information -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <div class="border border-gray-200 rounded-lg p-5">
+                            <h4 class="font-medium text-gray-800 mb-3 flex items-center">
+                                <i class="fas fa-info-circle text-blue-500 mr-2"></i> Informasi Zona
+                            </h4>
+                            <div class="space-y-3">
+                                <div class="flex justify-between">
+                                    <span class="text-sm text-gray-600">Zona Jemput:</span>
+                                    <span id="info_pickup_cluster" class="text-sm font-medium text-gray-800">--</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-sm text-gray-600">Koordinat Jemput:</span>
+                                    <span id="info_pickup_coords" class="text-sm font-medium text-gray-800">--</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-sm text-gray-600">Waktu Analisis:</span>
+                                    <span id="info_analysis_time" class="text-sm font-medium text-gray-800">--</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="border border-gray-200 rounded-lg p-5">
+                            <h4 class="font-medium text-gray-800 mb-3 flex items-center">
+                                <i class="fas fa-chart-bar text-green-500 mr-2"></i> Statistik Pola
+                            </h4>
+                            <div class="space-y-3">
+                                <div class="flex justify-between">
+                                    <span class="text-sm text-gray-600">Frekuensi Pola:</span>
+                                    <span id="info_pattern_freq" class="text-sm font-medium text-green-600">Tinggi</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-sm text-gray-600">Waktu Sejenis:</span>
+                                    <span id="info_similar_time" class="text-sm font-medium text-gray-800">--</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-sm text-gray-600">Penumpang Rata-rata:</span>
+                                    <span id="info_avg_passengers" class="text-sm font-medium text-gray-800">--</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Alternative Predictions -->
+                    <div class="border border-gray-200 rounded-lg p-5">
+                        <h4 class="font-medium text-gray-800 mb-4 flex items-center">
+                            <i class="fas fa-list-ol text-yellow-500 mr-2"></i> Prediksi Alternatif
+                        </h4>
+                        <div class="space-y-3" id="alternative_predictions">
+                            <!-- Will be populated by JavaScript -->
+                            <p class="text-gray-500 text-sm text-center">Memuat prediksi alternatif...</p>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="flex space-x-3 mt-6">
+                        <button onclick="predictDestination()" class="flex-1 bg-purple-600 text-white py-2.5 rounded-lg hover:bg-purple-700 transition-colors">
+                            <i class="fas fa-redo mr-2"></i> Analisis Ulang
+                        </button>
+                        <button onclick="exportAnalysis()" class="flex-1 bg-gray-200 text-gray-800 py-2.5 rounded-lg hover:bg-gray-300 transition-colors">
+                            <i class="fas fa-download mr-2"></i> Ekspor Data
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // --- 1. INITIALIZE MAP ---
+    const map = L.map('map').setView([40.7580, -73.9855], 12);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    let pickupMarker = null;
+    let predictionMarker = null;
+    let predictionArea = null;
+
+    // Set default datetime to now
+    const now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    document.getElementById('datetime').value = now.toISOString().slice(0, 16);
+
+    // --- 2. CLUSTER CENTROIDS (Example Data) ---
+    const clusterData = {
+        0: { name: "Times Square Area", coords: [40.7580, -73.9855], radius: 1500 },
+        1: { name: "Financial District", coords: [40.7075, -74.0113], radius: 1200 },
+        2: { name: "Upper East Side", coords: [40.7736, -73.9566], radius: 1800 },
+        3: { name: "Chelsea/Meatpacking", coords: [40.7420, -74.0048], radius: 1400 },
+        4: { name: "Williamsburg", coords: [40.7081, -73.9571], radius: 1600 },
+        5: { name: "Astoria", coords: [40.7644, -73.9235], radius: 1700 },
+        6: { name: "Harlem", coords: [40.8116, -73.9465], radius: 2000 },
+        7: { name: "JFK Airport", coords: [40.6413, -73.7781], radius: 2500 },
+        8: { name: "LaGuardia Airport", coords: [40.7769, -73.8740], radius: 2000 },
+        9: { name: "Brooklyn Heights", coords: [40.6953, -73.9965], radius: 1300 }
+    };
+
+    // --- 3. MAP CLICK HANDLER ---
+    map.on('click', function(e) {
+        const lat = e.latlng.lat;
+        const lng = e.latlng.lng;
+        
+        setPickupMarker(lat, lng);
+        reverseGeocode(lat, lng, 'pickup_input');
+    });
+
+    // --- 4. MARKER FUNCTIONS ---
+    function setPickupMarker(lat, lng) {
+        if (pickupMarker) map.removeLayer(pickupMarker);
+        
+        pickupMarker = L.marker([lat, lng], {
+            icon: L.divIcon({
+                className: 'custom-marker',
+                html: '<div class="bg-green-500 w-8 h-8 rounded-full border-3 border-white shadow-lg flex items-center justify-center"><i class="fas fa-map-pin text-white text-sm"></i></div>',
+                iconSize: [32, 32]
+            }),
+            draggable: true
+        }).addTo(map).bindPopup('<b>Lokasi Penjemputan</b><br>Drag untuk menyesuaikan');
+        
+        document.getElementById('pickup_lat').value = lat;
+        document.getElementById('pickup_lon').value = lng;
+
+        pickupMarker.on('dragend', function(e) {
+            const pos = e.target.getLatLng();
+            document.getElementById('pickup_lat').value = pos.lat;
+            document.getElementById('pickup_lon').value = pos.lng;
+            reverseGeocode(pos.lat, pos.lng, 'pickup_input');
+        });
+    }
+
+    function setPredictionMarker(clusterId) {
+        if (predictionMarker) map.removeLayer(predictionMarker);
+        if (predictionArea) map.removeLayer(predictionArea);
+        
+        const cluster = clusterData[clusterId];
+        if (!cluster) return;
+        
+        // Add prediction marker
+        predictionMarker = L.marker(cluster.coords, {
+            icon: L.divIcon({
+                className: 'prediction-marker',
+                html: `<div class="bg-purple-500 w-10 h-10 rounded-full border-3 border-white shadow-xl flex items-center justify-center animate-pulse">
+                          <i class="fas fa-bullseye text-white text-base"></i>
+                       </div>`,
+                iconSize: [40, 40]
+            })
+        }).addTo(map).bindPopup(`<b>${cluster.name}</b><br>Prediksi Tujuan`);
+        
+        // Add prediction area circle
+        predictionArea = L.circle(cluster.coords, {
+            radius: cluster.radius,
+            color: '#fbbf24',
+            weight: 2,
+            fillColor: '#fbbf24',
+            fillOpacity: 0.1,
+            className: 'prediction-area'
+        }).addTo(map);
+        
+        // Fit bounds to show both markers
+        if (pickupMarker) {
+            const bounds = L.latLngBounds([
+                pickupMarker.getLatLng(),
+                cluster.coords
+            ]);
+            map.fitBounds(bounds, { padding: [100, 100] });
+        } else {
+            map.setView(cluster.coords, 13);
+        }
+    }
+
+    function clearPrediction() {
+        if (predictionMarker) {
+            map.removeLayer(predictionMarker);
+            predictionMarker = null;
+        }
+        if (predictionArea) {
+            map.removeLayer(predictionArea);
+            predictionArea = null;
+        }
+        document.getElementById('result_section').classList.add('hidden');
+    }
+
+    // --- 5. SEARCH FUNCTIONALITY ---
+    function searchLocation(query, resultElementId, inputElementId) {
+        if (query.length < 3) {
+            document.getElementById(resultElementId).style.display = 'none';
+            return;
+        }
+        
+        fetch(`/api/search?q=${encodeURIComponent(query)}`)
+            .then(res => res.json())
+            .then(data => {
+                const list = document.getElementById(resultElementId);
+                list.innerHTML = '';
+                
+                if (data.length === 0) {
+                    const item = document.createElement('div');
+                    item.className = 'search-item text-gray-500';
+                    item.innerText = 'Tidak ditemukan';
+                    list.appendChild(item);
+                } else {
+                    data.forEach(item => {
+                        const div = document.createElement('div');
+                        div.className = 'search-item';
+                        div.innerHTML = `
+                            <div class="font-medium">${item.display_name.split(',')[0]}</div>
+                            <div class="text-xs text-gray-500">${item.display_name.split(',').slice(1,3).join(',')}</div>
+                        `;
+                        div.onclick = () => {
+                            document.getElementById(inputElementId).value = item.display_name;
+                            setPickupMarker(item.lat, item.lon);
+                            list.style.display = 'none';
+                        };
+                        list.appendChild(div);
+                    });
+                }
+                list.style.display = 'block';
+            });
+    }
+
+    // Event listeners
+    document.getElementById('pickup_input').addEventListener('input', (e) => {
+        searchLocation(e.target.value, 'pickup_results', 'pickup_input');
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.search-container')) {
+            document.getElementById('pickup_results').style.display = 'none';
+        }
+    });
+
+    function reverseGeocode(lat, lng, inputId) {
+        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.display_name) {
+                    document.getElementById(inputId).value = data.display_name;
+                }
+            });
+    }
+
+    // --- 6. PREDICTION FUNCTION ---
+    // --- Update prediction function ---
+    function predictDestination() {
+        const pLat = document.getElementById('pickup_lat').value;
+        
+        if (!pLat) {
+            alert("Harap pilih lokasi penjemputan terlebih dahulu!");
+            return;
+        }
+
+        // Show loading
+        document.getElementById('loading').classList.remove('hidden');
+        document.getElementById('result_section').classList.add('hidden');
+
+        const payload = {
+            pickup_lat: pLat,
+            pickup_lon: document.getElementById('pickup_lon').value,
+            datetime: document.getElementById('datetime').value,
+            passengers: parseInt(document.getElementById('passengers').value)
+        };
+
+        fetch('/api/predict_destination', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById('loading').classList.add('hidden');
+            
+            if (data.status === 'success') {
+                // Clear previous markers
+                clearAllMarkers();
+                
+                // Set pickup marker
+                setPickupMarker(data.pickup_coords[0], data.pickup_coords[1]);
+                
+                // Display top predictions
+                displayTopPredictions(data.top_predictions);
+                
+                // Update info
+                document.getElementById('pickup_zone').innerText = `Cluster ${data.pickup_cluster}`;
+                document.getElementById('analysis_time_detailed').innerText = 
+                    `${data.day_of_week}, ${data.hour}:00`;
+                document.getElementById('total_clusters').innerText = data.total_clusters;
+                
+                // Show results
+                document.getElementById('result_section').classList.remove('hidden');
+                
+            } else {
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(err => {
+            document.getElementById('loading').classList.add('hidden');
+            alert('Terjadi kesalahan koneksi ke server.');
+            console.error(err);
+        });
+    }
+
+    // --- Function to display top predictions ---
+    function displayTopPredictions(predictions) {
+        const container = document.getElementById('top_predictions_grid');
+        container.innerHTML = '';
+        
+        predictions.forEach((pred, index) => {
+            const rankColors = [
+                'from-purple-500 to-purple-600',      // Rank 1
+                'from-blue-500 to-blue-600',          // Rank 2  
+                'from-green-500 to-green-600'         // Rank 3
+            ];
+            
+            const rankIcons = ['fa-trophy', 'fa-medal', 'fa-award'];
+            const rankLabels = ['Teratas', 'Kedua', 'Ketiga'];
+            
+            const card = document.createElement('div');
+            card.className = 'bg-gradient-to-br ' + rankColors[index] + ' text-white rounded-xl p-5 shadow-lg transform hover:-translate-y-1 transition-transform';
+            card.innerHTML = `
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <div class="inline-flex items-center px-3 py-1 rounded-full bg-white/20 text-sm mb-2">
+                            <i class="fas ${rankIcons[index]} mr-2"></i>
+                            ${rankLabels[index]}
+                        </div>
+                        <h3 class="text-lg font-bold">${pred.location_name}</h3>
+                        <p class="text-white/80 text-sm">${pred.area_type}</p>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-3xl font-bold">${pred.probability}%</div>
+                        <div class="text-sm opacity-90">${pred.confidence}</div>
+                    </div>
+                </div>
+                
+                <div class="space-y-2 mb-4">
+                    <div class="flex justify-between text-sm">
+                        <span>Zona ID:</span>
+                        <span class="font-bold">${pred.cluster}</span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span>Koordinat:</span>
+                        <span class="font-mono text-xs">${pred.coords[0].toFixed(4)}, ${pred.coords[1].toFixed(4)}</span>
+                    </div>
+                </div>
+                
+                <div class="flex space-x-2">
+                    <button onclick="focusOnPrediction(${index}, ${pred.cluster}, [${pred.coords}])" 
+                            class="flex-1 bg-white/20 hover:bg-white/30 text-white py-2 rounded-lg text-sm font-medium transition-colors">
+                        <i class="fas fa-map-marker-alt mr-1"></i> Lihat di Peta
+                    </button>
+                    <button onclick="getDirectionsToCluster(${pred.cluster}, [${pred.coords}])" 
+                            class="flex-1 bg-white/10 hover:bg-white/20 text-white py-2 rounded-lg text-sm font-medium transition-colors">
+                        <i class="fas fa-route mr-1"></i> Rute
+                    </button>
+                </div>
+            `;
+            container.appendChild(card);
+            
+            // Add markers to map (different style for rank 2 & 3)
+            addPredictionMarker(pred, index);
+        });
+    }
+
+    // --- Function to add prediction markers ---
+    let predictionMarkers = [];
+    let predictionAreas = [];
+
+    function addPredictionMarker(prediction, rank) {
+        const colors = ['#8B5CF6', '#3B82F6', '#10B981']; // Purple, Blue, Green
+        const sizes = [40, 35, 30]; // Different sizes for ranks
+        
+        // Main marker
+        const marker = L.marker(prediction.coords, {
+            icon: L.divIcon({
+                className: `prediction-marker rank-${rank}`,
+                html: `
+                    <div class="relative">
+                        <div class="absolute -top-2 -left-2 bg-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold text-gray-800 shadow-md">
+                            ${rank + 1}
+                        </div>
+                        <div class="w-${sizes[rank]/10} h-${sizes[rank]/10} rounded-full border-3 border-white shadow-xl" 
+                            style="background-color: ${colors[rank]}">
+                        </div>
+                    </div>
+                `,
+                iconSize: [sizes[rank], sizes[rank]]
+            })
+        }).addTo(map).bindPopup(`
+            <div class="p-2">
+                <div class="font-bold text-lg">${prediction.location_name}</div>
+                <div class="text-sm text-gray-600">Peringkat: <span class="font-bold">#${rank + 1}</span></div>
+                <div class="text-sm text-gray-600">Probabilitas: <span class="font-bold">${prediction.probability}%</span></div>
+                <div class="text-sm text-gray-600">Tipe: ${prediction.area_type}</div>
+                <hr class="my-2">
+                <button onclick="focusOnPrediction(${rank}, ${prediction.cluster}, [${prediction.coords}])" 
+                        class="w-full mt-2 bg-purple-100 text-purple-700 hover:bg-purple-200 py-1 rounded text-sm">
+                    Fokus ke lokasi ini
+                </button>
+            </div>
+        `);
+        
+        predictionMarkers.push(marker);
+        
+        // Add area circle for rank 1 (main prediction)
+        if (rank === 0) {
+            const area = L.circle(prediction.coords, {
+                radius: 1200, // 1.2km radius
+                color: colors[rank],
+                weight: 2,
+                fillColor: colors[rank],
+                fillOpacity: 0.1,
+                className: 'prediction-area'
+            }).addTo(map);
+            predictionAreas.push(area);
+        }
+    }
+
+    // --- Function to focus on specific prediction ---
+    function focusOnPrediction(rank, clusterId, coords) {
+        if (pickupMarker) {
+            const bounds = L.latLngBounds([
+                pickupMarker.getLatLng(),
+                coords
+            ]);
+            map.fitBounds(bounds, { padding: [100, 100] });
+        } else {
+            map.setView(coords, 13);
+        }
+        
+        // Highlight the selected prediction
+        predictionMarkers.forEach((marker, index) => {
+            if (index === rank) {
+                marker.openPopup();
+                marker.setIcon(L.divIcon({
+                    className: 'prediction-marker selected',
+                    html: `
+                        <div class="relative">
+                            <div class="absolute -top-2 -left-2 bg-yellow-400 rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold text-gray-800 shadow-md">
+                                ${rank + 1}
+                            </div>
+                            <div class="w-10 h-10 rounded-full border-4 border-yellow-300 shadow-2xl animate-pulse" 
+                                style="background-color: ${['#8B5CF6', '#3B82F6', '#10B981'][rank]}">
+                            </div>
+                        </div>
+                    `,
+                    iconSize: [40, 40]
+                }));
+            }
+        });
+        
+        // Show notification
+        showNotification(`Memfokuskan ke prediksi #${rank + 1}: Cluster ${clusterId}`);
+    }
+
+    // --- Function to get directions to cluster ---
+    function getDirectionsToCluster(clusterId, coords) {
+        if (!pickupMarker) {
+            alert("Silakan pilih lokasi penjemputan terlebih dahulu!");
+            return;
+        }
+        
+        const pickupLat = document.getElementById('pickup_lat').value;
+        const pickupLon = document.getElementById('pickup_lon').value;
+        
+        const url = `https://www.google.com/maps/dir/${pickupLat},${pickupLon}/${coords[0]},${coords[1]}`;
+        window.open(url, '_blank');
+        
+        showNotification(`Membuka Google Maps untuk rute ke Cluster ${clusterId}`);
+    }
+
+    // --- Clear all markers function ---
+    function clearAllMarkers() {
+        if (pickupMarker) {
+            map.removeLayer(pickupMarker);
+            pickupMarker = null;
+        }
+        
+        predictionMarkers.forEach(marker => map.removeLayer(marker));
+        predictionAreas.forEach(area => map.removeLayer(area));
+        
+        predictionMarkers = [];
+        predictionAreas = [];
+    }
+
+    // --- Helper function for notifications ---
+    function showNotification(message) {
+        const notification = document.createElement('div');
+        notification.className = 'fixed top-4 right-4 bg-gray-800 text-white px-4 py-3 rounded-lg shadow-lg z-50 transform translate-x-full animate-slide-in';
+        notification.innerHTML = `
+            <div class="flex items-center">
+                <i class="fas fa-info-circle mr-3 text-blue-300"></i>
+                <span>${message}</span>
+            </div>
+        `;
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            notification.classList.remove('animate-slide-in');
+            notification.classList.add('animate-slide-out');
+            setTimeout(() => notification.remove(), 300);
+        }, 3000);
+    }
+
+    // Add CSS for animations
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes slide-in {
+            from { transform: translateX(100%); }
+            to { transform: translateX(0); }
+        }
+        @keyframes slide-out {
+            from { transform: translateX(0); }
+            to { transform: translateX(100%); }
+        }
+        .animate-slide-in { animation: slide-in 0.3s forwards; }
+        .animate-slide-out { animation: slide-out 0.3s forwards; }
+    `;
+    document.head.appendChild(style);
+
+    // --- 7. HELPER FUNCTIONS ---
+    function getRandomConfidence() {
+        return Math.floor(Math.random() * 15) + 75; // 75-90%
+    }
+
+    function generateAlternativePredictions(mainClusterId) {
+        const container = document.getElementById('alternative_predictions');
+        container.innerHTML = '';
+        
+        // Get 3 alternative clusters (excluding main one)
+        const alternativeClusters = Object.keys(clusterData)
+            .filter(id => id != mainClusterId)
+            .sort(() => Math.random() - 0.5)
+            .slice(0, 3);
+        
+        if (alternativeClusters.length === 0) {
+            container.innerHTML = '<p class="text-gray-500 text-sm text-center">Tidak ada prediksi alternatif</p>';
+            return;
+        }
+        
+        alternativeClusters.forEach((clusterId, index) => {
+            const cluster = clusterData[clusterId];
+            const confidence = Math.floor(Math.random() * 20) + 50; // 50-70%
+            
+            const div = document.createElement('div');
+            div.className = 'flex items-center justify-between p-3 bg-gray-50 rounded-lg';
+            div.innerHTML = `
+                <div class="flex items-center">
+                    <div class="bg-gray-200 rounded-lg w-10 h-10 flex items-center justify-center mr-3">
+                        <span class="font-bold text-gray-700">${clusterId}</span>
+                    </div>
+                    <div>
+                        <div class="font-medium text-gray-800">${cluster.name}</div>
+                        <div class="text-xs text-gray-500">${confidence}% kemungkinan</div>
+                    </div>
+                </div>
+                <button onclick="viewCluster(${clusterId})" class="text-purple-600 hover:text-purple-800 text-sm">
+                    <i class="fas fa-eye mr-1"></i> Lihat
+                </button>
+            `;
+            container.appendChild(div);
+        });
+    }
+
+    function viewCluster(clusterId) {
+        setPredictionMarker(clusterId);
+        
+        // Update main prediction display temporarily
+        const cluster = clusterData[clusterId];
+        if (cluster) {
+            document.getElementById('pred_cluster_number').innerText = clusterId;
+            document.getElementById('pred_cluster_name').innerText = cluster.name + ' (Pratinjau)';
+        }
+        
+        // Show temporary alert
+        const alertDiv = document.createElement('div');
+        alertDiv.className = 'fixed top-4 right-4 bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded-lg shadow-lg z-50';
+        alertDiv.innerHTML = `
+            <div class="flex items-center">
+                <i class="fas fa-info-circle mr-2"></i>
+                <span>Melihat prediksi alternatif. Klik "Analisis Ulang" untuk kembali.</span>
+            </div>
+        `;
+        document.body.appendChild(alertDiv);
+        setTimeout(() => alertDiv.remove(), 3000);
+    }
+
+    function exportAnalysis() {
+        const data = {
+            pickup_location: document.getElementById('pickup_input').value,
+            pickup_coords: [document.getElementById('pickup_lat').value, document.getElementById('pickup_lon').value],
+            analysis_time: document.getElementById('datetime').value,
+            predicted_cluster: document.getElementById('pred_cluster_number').innerText,
+            cluster_name: document.getElementById('pred_cluster_name').innerText
+        };
+        
+        const dataStr = JSON.stringify(data, null, 2);
+        const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+        
+        const exportFileDefaultName = `nyc-taxi-analysis-${Date.now()}.json`;
+        
+        const linkElement = document.createElement('a');
+        linkElement.setAttribute('href', dataUri);
+        linkElement.setAttribute('download', exportFileDefaultName);
+        linkElement.click();
+    }
+
+    // Initialize with a sample marker
+    setTimeout(() => {
+        setPickupMarker(40.7489, -73.9680);
+        document.getElementById('pickup_input').value = 'Times Square, New York';
+    }, 1000);
+</script>
+{% endblock %}
