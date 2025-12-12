@@ -14,68 +14,105 @@ app = Flask(__name__)
 MODEL_PATH = 'models/'
 models = {}
 
-# NYC Cluster names for 6 clusters with user-friendly names
+# NYC Cluster names for 10 clusters
 CLUSTER_NAMES = {
     0: {
-        "name": "Financial District", 
-        "type": "Business/Finance", 
-        "color": "#3B82F6",
-        "description": "Wall Street, World Trade Center, Battery Park"
+        "name": "Lower Manhattan & Financial District",
+        "type": "Business Hub",
+        "color": "#1F77B4",
+        "description": "Wall Street, World Trade Center, Tribeca. Busy business and office center."
     },
     1: {
-        "name": "Queens Central", 
-        "type": "Residential/Transport", 
-        "color": "#10B981",
-        "description": "Astoria, Long Island City, residential areas"
+        "name": "Upper East Side & Roosevelt Island",
+        "type": "Upscale Residential",
+        "color": "#9467BD",
+        "description": "Elite residential area, museums, and access to Roosevelt Island."
     },
     2: {
-        "name": "Upper Manhattan", 
-        "type": "Upscale Residential", 
-        "color": "#8B5CF6",
-        "description": "Upper West Side, Upper East Side near Central Park"
+        "name": "JFK International Airport",
+        "type": "Airport/Travel",
+        "color": "#D62728",
+        "description": "JFK Airport. High-fare area and long-distance travel hub."
     },
     3: {
-        "name": "Midtown Manhattan", 
-        "type": "Business/Tourism", 
-        "color": "#EF4444",
-        "description": "Times Square, Theater District, Grand Central"
+        "name": "Chelsea, Flatiron & Union Square",
+        "type": "Lifestyle/Tech",
+        "color": "#E377C2",
+        "description": "Restaurant, shopping, and tech startup center."
     },
     4: {
-        "name": "Brooklyn Downtown", 
-        "type": "Residential/Commercial", 
-        "color": "#F59E0B",
-        "description": "Downtown Brooklyn, Barclays Center area"
+        "name": "Central Brooklyn (Park Slope/Prospect)",
+        "type": "Residential",
+        "color": "#8C564B",
+        "description": "Dense Brooklyn residential area, near Prospect Park."
     },
     5: {
-        "name": "JFK/Outer Boroughs", 
-        "type": "Airport/Transport", 
-        "color": "#EC4899",
-        "description": "JFK Airport, outer borough connections"
+        "name": "LaGuardia Airport (LGA) & Astoria",
+        "type": "Airport/Mixed",
+        "color": "#FF7F0E",
+        "description": "LGA Airport and Astoria/Queens culinary area."
+    },
+    6: {
+        "name": "Williamsburg & Greenpoint",
+        "type": "Hipster/Nightlife",
+        "color": "#BCBD22",
+        "description": "Art, cafe, and nightlife center in North Brooklyn."
+    },
+    7: {
+        "name": "Midtown Manhattan (Times Square)",
+        "type": "Tourism/Business",
+        "color": "#17BECF",
+        "description": "Times Square, Theater District, Rockefeller Center. Very busy."
+    },
+    8: {
+        "name": "Upper West Side & Harlem",
+        "type": "Residential/Academic",
+        "color": "#2CA02C",
+        "description": "Columbia University, Lincoln Center, and family residential area."
+    },
+    9: {
+        "name": "North Manhattan & Bronx Hub",
+        "type": "Mixed Residential",
+        "color": "#7F7F7F",
+        "description": "Washington Heights, Inwood, and bridges to Bronx."
     }
 }
 
 def load_models():
     """Load all ML models and cluster data"""
     try:
+        print("🔄 Loading models from:", MODEL_PATH)
+        
         # Model 1: Duration Prediction
+        print("  Loading XGBoost duration model...")
         models['xgb_duration'] = joblib.load(MODEL_PATH + 'xgb_problem1_final.pkl')
         models['feat_duration'] = joblib.load(MODEL_PATH + 'features_problem1_final.pkl')
         
-        # Model 2: Destination Prediction (LightGBM)
-        models['lgb_dest'] = joblib.load(MODEL_PATH + 'best_model_problem2.pkl')
+        # Model 2: Destination Prediction (NEW LightGBM)
+        print("  Loading LightGBM destination model...")
+        models['lgb_dest'] = joblib.load(MODEL_PATH + 'lgbm_destination_prediction.pkl')
         models['feat_dest'] = joblib.load(MODEL_PATH + 'features_problem2_final.pkl')
         
-        # Unified Clustering Model
+        # NEW K-Means Clustering Model (10 clusters)
+        print("  Loading K-Means clustering model...")
         models['kmeans'] = joblib.load(MODEL_PATH + 'kmeans_pickup.pkl')
         
-        # Load cluster centroids from JSON
+        # Load NEW cluster centroids from JSON (10 clusters)
+        print("  Loading cluster centroids...")
         with open(MODEL_PATH + 'cluster_centroids.json', 'r') as f:
             cluster_data = json.load(f)
         
-        # Process unified centroids (both pickup and dropoff have same coordinates)
+        # VERIFY CENTROIDS
+        print(f"  Found {len(cluster_data['pickup_clusters'])} pickup centroids")
+        print(f"  Found {len(cluster_data['dropoff_clusters'])} dropoff centroids")
+        
+        # Process unified centroids
         models['cluster_centroids'] = []
-        # Assuming both arrays are identical, use pickup_clusters
         for i, centroid in enumerate(cluster_data['pickup_clusters']):
+            if i >= len(CLUSTER_NAMES):
+                print(f"⚠️  Warning: More centroids ({len(cluster_data['pickup_clusters'])}) than cluster names ({len(CLUSTER_NAMES)})")
+                break
+                
             models['cluster_centroids'].append({
                 'id': i,
                 'coordinates': centroid,
@@ -84,12 +121,25 @@ def load_models():
                 'color': CLUSTER_NAMES[i]['color']
             })
         
-        print("✅ All models loaded successfully")
+        print("\n✅ All models loaded successfully")
         print(f"✅ Destination model: {type(models['lgb_dest']).__name__}")
-        print(f"✅ Unified clusters: {len(models['cluster_centroids'])} zones")
+        print(f"✅ K-Means n_clusters: {models['kmeans'].n_clusters}")
+        print(f"✅ Cluster centroids loaded: {len(models['cluster_centroids'])} zones")
+        
+        # Print cluster info for verification
+        print("\n🔍 Cluster Information:")
+        for i, cluster in enumerate(models['cluster_centroids']):
+            print(f"  Zone {i}: {cluster['name']} ({cluster['type']})")
+            print(f"    Coordinates: {cluster['coordinates'][0]:.4f}, {cluster['coordinates'][1]:.4f}")
+        
+        # Verify K-Means compatibility
+        if models['kmeans'].n_clusters != len(models['cluster_centroids']):
+            print(f"⚠️  WARNING: K-Means has {models['kmeans'].n_clusters} clusters, but centroids has {len(models['cluster_centroids'])}")
         
     except Exception as e:
         print(f"❌ Error loading models: {e}")
+        import traceback
+        traceback.print_exc()
         raise e
 
 load_models()
@@ -125,6 +175,8 @@ def get_confidence_label(probability):
     else:
         return "Low"
 
+from datetime import datetime  # Pastikan ini sudah di import
+
 # --- ROUTES ---
 @app.route('/')
 def home():
@@ -132,11 +184,16 @@ def home():
 
 @app.route('/duration')
 def duration_page():
-    return render_template('duration.html')
+    # Kirim waktu sekarang ke template
+    now = datetime.now()
+    return render_template('duration.html', now=now)
 
 @app.route('/destination')
 def destination_page():
-    return render_template('destination.html')
+    # Kirim waktu sekarang ke template
+    now = datetime.now()
+    return render_template('destination.html', now=now)
+
 
 # --- API ENDPOINTS ---
 @app.route('/api/clusters', methods=['GET'])
@@ -192,7 +249,7 @@ def predict_duration():
         m_sin = np.sin(2 * np.pi * month / 12)
         m_cos = np.cos(2 * np.pi * month / 12)
         
-        # Unified Clustering
+        # NEW K-Means Clustering (10 clusters)
         p_cluster = models['kmeans'].predict([[p_lat, p_lon]])[0]
         d_cluster = models['kmeans'].predict([[d_lat, d_lon]])[0]
 
@@ -278,10 +335,10 @@ def predict_destination():
         m_sin = np.sin(2 * np.pi * month / 12)
         m_cos = np.cos(2 * np.pi * month / 12)
         
-        # Unified Clustering for pickup
+        # NEW K-Means Clustering for pickup (10 clusters)
         p_cluster = models['kmeans'].predict([[p_lat, p_lon]])[0]
         
-        # Prepare input for LightGBM model
+        # Prepare input for NEW LightGBM model
         input_data = {
             'pickup_longitude': p_lon,
             'pickup_latitude': p_lat,
@@ -355,10 +412,11 @@ def predict_destination():
             'month': month,
             'day_of_week': ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][day],
             'top_predictions': top_3_predictions,
-            'total_clusters': 6,
+            'total_clusters': len(models['cluster_centroids']),
             'model_info': {
                 'type': 'LightGBM',
-                'clusters_unified': True
+                'clusters_unified': True,
+                'n_clusters': len(models['cluster_centroids'])
             }
         })
         

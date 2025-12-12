@@ -44,11 +44,8 @@
         color: #0284c7; 
     }
     
-    .search-item:last-child { 
-        border-bottom: none; 
-    }
-    
-    .cluster-area {
+    .cluster-circle {
+        stroke-width: 2;
         stroke-dasharray: 5,5;
         animation: dash 30s linear infinite;
     }
@@ -58,296 +55,150 @@
     }
     
     .prediction-card {
-        transition: all 0.3s ease;
-        border-left: 4px solid transparent;
+        border-left: 4px solid;
+        transition: transform 0.3s;
     }
     
     .prediction-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        transform: translateY(-5px);
     }
     
     .rank-badge {
-        width: 28px;
-        height: 28px;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
         display: flex;
         align-items: center;
         justify-content: center;
-        border-radius: 50%;
-        font-weight: bold;
         color: white;
+        font-weight: bold;
         font-size: 14px;
     }
     
-    .cluster-legend {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 6px 12px;
-        background: rgba(255, 255, 255, 0.9);
-        border-radius: 20px;
-        backdrop-filter: blur(4px);
-    }
-    
-    .legend-dot {
-        width: 12px;
-        height: 12px;
-        border-radius: 50%;
-        border: 2px solid white;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    
-    .model-badge {
-        font-size: 10px;
-        padding: 2px 6px;
-        border-radius: 10px;
-        background: linear-gradient(45deg, #8B5CF6, #3B82F6);
-        color: white;
-        font-weight: 600;
+    .cluster-area {
+        fill-opacity: 0.1;
+        stroke-width: 2;
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <!-- Page Header -->
     <div class="mb-8">
-        <nav class="flex items-center text-sm text-gray-600 mb-4">
-            <a href="/" class="text-blue-600 hover:text-blue-800 hover:underline flex items-center">
-                <i class="fas fa-home mr-1"></i> Home
-            </a>
-            <i class="fas fa-chevron-right mx-2 text-gray-400 text-xs"></i>
-            <span class="text-gray-800 font-medium">Destination Analysis</span>
-        </nav>
-        
-        <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
-            <div>
-                <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">NYC Taxi Destination Prediction</h1>
-                <p class="text-gray-600 max-w-2xl">
-                    AI analyzes the most likely destination zones based on pickup location, time, and historical trip patterns of NYC taxis.
-                </p>
-            </div>
-            <div class="flex items-center gap-2">
-                <div class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
-                    <i class="fas fa-brain mr-1"></i> LightGBM AI
-                </div>
-                <div class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
-                    <i class="fas fa-bolt mr-1"></i> Real-time
-                </div>
-                <span class="model-badge">6 Unified Zones</span>
-            </div>
-        </div>
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">NYC Taxi Destination Prediction</h1>
+        <p class="text-gray-600">Prediksi 3 zona tujuan teratas berdasarkan lokasi awal dan waktu</p>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <!-- Left Panel: Input Form -->
+        <!-- Left Panel: Input -->
         <div class="lg:col-span-1">
             <div class="glass-card rounded-2xl p-6 shadow-lg border border-gray-100 h-full">
-                <div class="flex items-center mb-6">
-                    <div class="bg-gradient-to-r from-purple-500 to-purple-600 p-2 rounded-xl mr-3">
-                        <i class="fas fa-map-marker-alt text-white text-lg"></i>
+                <h2 class="text-xl font-bold text-gray-900 mb-6">Input Data</h2>
+
+                <!-- Time Selection -->
+                <div class="mb-6">
+                    <label class="block text-sm font-semibold text-gray-800 mb-2">
+                        <i class="far fa-clock text-gray-600 mr-2"></i> Waktu
+                    </label>
+                    <div class="flex gap-2 mb-2">
+                        <select id="hour" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg">
+                            {% for h in range(24) %}
+                            <option value="{{ h }}" {% if h==now.hour %}selected{% endif %}>{{ "%02d"|format(h) }}:00</option>
+                            {% endfor %}
+                        </select>
+                        <select id="day" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg">
+                            <option value="0">Senin</option>
+                            <option value="1">Selasa</option>
+                            <option value="2">Rabu</option>
+                            <option value="3">Kamis</option>
+                            <option value="4">Jumat</option>
+                            <option value="5">Sabtu</option>
+                            <option value="6">Minggu</option>
+                        </select>
                     </div>
-                    <div>
-                        <h2 class="text-xl font-bold text-gray-900">Trip Input</h2>
-                        <p class="text-sm text-gray-500">Enter your trip details</p>
-                    </div>
+                </div>
+
+                <!-- Passengers -->
+                <div class="mb-6">
+                    <label class="block text-sm font-semibold text-gray-800 mb-2">
+                        <i class="fas fa-users text-gray-600 mr-2"></i> Penumpang
+                    </label>
+                    <input type="number" id="passengers" min="1" max="6" value="1"
+                           class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
                 </div>
 
                 <!-- Pickup Location -->
                 <div class="mb-6">
                     <label class="block text-sm font-semibold text-gray-800 mb-2">
-                        <i class="fas fa-map-pin text-green-500 mr-2"></i> Pickup Location
+                        <i class="fas fa-map-pin text-green-500 mr-2"></i> Lokasi Awal
                     </label>
                     <div class="search-container">
                         <div class="relative">
                             <input type="text" id="pickup_input" 
-                                   class="w-full px-4 py-3 pl-10 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
-                                   placeholder="Search location...">
+                                   class="w-full px-4 py-3 pl-10 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                   placeholder="Cari lokasi awal...">
                             <i class="fas fa-search absolute left-3 top-3.5 text-gray-400"></i>
                         </div>
                         <div id="pickup_results" class="search-results"></div>
                     </div>
-                    <div class="mt-2 flex justify-between">
-                        <p class="text-xs text-gray-500">Or click directly on map</p>
-                        <button onclick="useCurrentLocation()" class="text-xs text-blue-600 hover:text-blue-800 flex items-center">
-                            <i class="fas fa-location-crosshairs mr-1"></i> My Location
-                        </button>
-                    </div>
+                    <p class="text-xs text-gray-500 mt-2">Atau klik di peta</p>
                     <input type="hidden" id="pickup_lat">
                     <input type="hidden" id="pickup_lon">
                 </div>
 
-                <!-- Time and Passengers -->
-                <div class="grid grid-cols-2 gap-4 mb-6">
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-800 mb-2">
-                            <i class="far fa-clock text-gray-600 mr-2"></i> Date & Time
-                        </label>
-                        <input type="datetime-local" id="datetime" 
-                               class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-800 mb-2">
-                            <i class="fas fa-users text-gray-600 mr-2"></i> Passengers
-                        </label>
-                        <div class="relative">
-                            <input type="number" id="passengers" min="1" max="6" value="1"
-                                   class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
-                            <div class="absolute right-3 top-3 text-gray-400">
-                                <i class="fas fa-user"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Quick Time Presets -->
-                <div class="mb-6">
-                    <label class="block text-sm font-semibold text-gray-800 mb-2">
-                        <i class="fas fa-bolt text-gray-600 mr-2"></i> Quick Time Presets
-                    </label>
-                    <div class="grid grid-cols-3 gap-2">
-                        <button onclick="setTimePreset('morning')" class="py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-sm transition-colors">
-                            Morning<br>(7-9 AM)
-                        </button>
-                        <button onclick="setTimePreset('afternoon')" class="py-2 bg-green-50 hover:bg-green-100 text-green-700 rounded-lg text-sm transition-colors">
-                            Afternoon<br>(12-2 PM)
-                        </button>
-                        <button onclick="setTimePreset('evening')" class="py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg text-sm transition-colors">
-                            Evening<br>(5-7 PM)
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Model Info -->
-                <div class="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-100 rounded-xl p-4 mb-6">
-                    <div class="flex items-start">
-                        <div class="bg-white p-2 rounded-lg mr-3 shadow-sm">
-                            <i class="fas fa-robot text-purple-600 text-lg"></i>
-                        </div>
-                        <div>
-                            <h4 class="font-semibold text-purple-900 mb-1">Advanced AI Model</h4>
-                            <p class="text-sm text-purple-800 leading-relaxed">
-                                LightGBM Classifier trained on 1.2 million NYC taxi trips. Prediction accuracy: 85.2%. Unified clustering system.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
                 <!-- Predict Button -->
                 <button onclick="predictDestination()" id="predictBtn"
-                        class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold py-3.5 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center justify-center group">
-                    <i class="fas fa-search-location mr-3 text-lg"></i>
-                    <span class="text-base">Predict Destination</span>
-                    <i class="fas fa-arrow-right ml-2 group-hover:translate-x-1 transition-transform"></i>
+                        class="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3.5 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center">
+                    <i class="fas fa-bullseye mr-3 text-lg"></i>
+                    <span class="text-base">Prediksi Tujuan</span>
                 </button>
 
-                <!-- Loading Indicator -->
+                <!-- Loading -->
                 <div id="loading" class="hidden mt-6 text-center">
-                    <div class="inline-flex flex-col items-center">
-                        <div class="relative">
-                            <div class="w-12 h-12 border-4 border-purple-200 rounded-full"></div>
-                            <div class="absolute top-0 left-0 w-12 h-12 border-4 border-purple-600 rounded-full border-t-transparent animate-spin"></div>
+                    <div class="inline-flex items-center">
+                        <div class="relative mr-3">
+                            <div class="w-8 h-8 border-4 border-purple-200 rounded-full"></div>
+                            <div class="absolute top-0 left-0 w-8 h-8 border-4 border-purple-600 rounded-full border-t-transparent animate-spin"></div>
                         </div>
-                        <p class="text-gray-600 mt-3 font-medium">Analyzing travel patterns...</p>
-                        <p class="text-sm text-gray-500 mt-1">AI is processing data</p>
+                        <p class="text-gray-600">Menganalisis pola perjalanan...</p>
                     </div>
                 </div>
             </div>
         </div>
 
         <!-- Right Panel: Map and Results -->
-        <div class="lg:col-span-2 space-y-8">
-            <!-- Map Container -->
-            <div class="glass-card rounded-2xl overflow-hidden shadow-lg border border-gray-100">
-                <div class="p-1">
-                    <div id="map"></div>
-                </div>
-                <div class="p-4 bg-gradient-to-r from-gray-50 to-gray-100 border-t border-gray-200 flex flex-wrap items-center justify-between gap-3">
-                    <div class="flex flex-wrap items-center gap-4">
-                        <div class="cluster-legend">
-                            <div class="legend-dot" style="background-color: #3B82F6;"></div>
-                            <span class="text-xs font-medium text-gray-700">Financial District</span>
+        <div class="lg:col-span-2">
+            <!-- Map -->
+            <div class="glass-card rounded-2xl overflow-hidden shadow-lg border border-gray-100 mb-8">
+                <div id="map" class="h-[400px]"></div>
+                <div class="p-4 border-t border-gray-200 bg-gray-50">
+                    <div class="flex flex-wrap gap-3 text-sm">
+                        <div class="flex items-center">
+                            <div class="w-3 h-3 rounded-full bg-green-500 mr-2"></div>
+                            <span class="text-gray-700">Lokasi Awal</span>
                         </div>
-                        <div class="cluster-legend">
-                            <div class="legend-dot" style="background-color: #EF4444;"></div>
-                            <span class="text-xs font-medium text-gray-700">Midtown</span>
+                        <div class="flex items-center">
+                            <div class="w-3 h-3 rounded-full bg-red-500 mr-2"></div>
+                            <span class="text-gray-700">Tujuan #1</span>
                         </div>
-                        <div class="cluster-legend">
-                            <div class="legend-dot" style="background-color: #10B981;"></div>
-                            <span class="text-xs font-medium text-gray-700">Queens Central</span>
+                        <div class="flex items-center">
+                            <div class="w-3 h-3 rounded-full bg-blue-500 mr-2"></div>
+                            <span class="text-gray-700">Tujuan #2</span>
                         </div>
-                    </div>
-                    <div class="flex items-center gap-3">
-                        <button onclick="clearMap()" class="text-sm text-gray-700 hover:text-red-600 flex items-center px-3 py-1.5 hover:bg-red-50 rounded-lg transition-colors">
-                            <i class="fas fa-trash-alt mr-2"></i> Clear All
-                        </button>
-                        <button onclick="toggleClusters()" id="toggleClustersBtn" class="text-sm bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 transition-colors flex items-center">
-                            <i class="fas fa-layer-group mr-2"></i> Show Zones
-                        </button>
+                        <div class="flex items-center">
+                            <div class="w-3 h-3 rounded-full bg-yellow-500 mr-2"></div>
+                            <span class="text-gray-700">Tujuan #3</span>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Results Section -->
-            <div id="result_section" class="hidden animate-fadeIn">
-                <div class="glass-card rounded-2xl p-6 shadow-lg border border-gray-100">
-                    <div class="flex items-center justify-between mb-6">
-                        <div class="flex items-center">
-                            <div class="bg-gradient-to-r from-purple-500 to-pink-500 p-2 rounded-lg mr-3">
-                                <i class="fas fa-trophy text-white text-lg"></i>
-                            </div>
-                            <div>
-                                <h2 class="text-xl font-bold text-gray-900">Prediction Results</h2>
-                                <p class="text-sm text-gray-500">Top 3 destination zones based on AI analysis</p>
-                            </div>
-                        </div>
-                        <div id="confidence_badge" class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
-                            <i class="fas fa-check-circle mr-1"></i> High Accuracy
-                        </div>
-                    </div>
-                    
-                    <!-- Top Predictions Grid -->
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8" id="top_predictions_grid">
-                        <!-- Will be populated by JavaScript -->
-                    </div>
-
-                    <!-- Analysis Details -->
-                    <div class="border border-gray-200 rounded-xl p-5 mb-6 bg-gradient-to-r from-gray-50 to-white">
-                        <h4 class="font-semibold text-gray-800 mb-4 flex items-center">
-                            <i class="fas fa-chart-line text-blue-600 mr-2"></i> Analysis Details
-                        </h4>
-                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <div class="bg-white p-3 rounded-lg border border-gray-100">
-                                <p class="text-xs text-gray-500 mb-1">Pickup Zone</p>
-                                <p id="pickup_zone" class="font-bold text-gray-800 text-lg">--</p>
-                            </div>
-                            <div class="bg-white p-3 rounded-lg border border-gray-100">
-                                <p class="text-xs text-gray-500 mb-1">Analysis Time</p>
-                                <p id="analysis_time" class="font-bold text-gray-800 text-lg">--:--</p>
-                            </div>
-                            <div class="bg-white p-3 rounded-lg border border-gray-100">
-                                <p class="text-xs text-gray-500 mb-1">Passengers</p>
-                                <p id="analysis_passengers" class="font-bold text-gray-800 text-lg">--</p>
-                            </div>
-                            <div class="bg-white p-3 rounded-lg border border-gray-100">
-                                <p class="text-xs text-gray-500 mb-1">Model</p>
-                                <p id="model_type" class="font-bold text-gray-800 text-lg">LightGBM</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Action Buttons -->
-                    <div class="flex flex-col sm:flex-row gap-3">
-                        <button onclick="predictDestination()" class="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-3 rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all font-semibold shadow-md hover:shadow-lg flex items-center justify-center">
-                            <i class="fas fa-redo mr-2"></i> Reanalyze
-                        </button>
-                        <button onclick="exportAnalysis()" class="flex-1 bg-white border border-gray-300 text-gray-800 py-3 rounded-xl hover:bg-gray-50 transition-colors font-semibold shadow-sm hover:shadow flex items-center justify-center">
-                            <i class="fas fa-download mr-2"></i> Export Results
-                        </button>
-                        <button onclick="shareResults()" class="flex-1 bg-blue-50 text-blue-700 py-3 rounded-xl hover:bg-blue-100 transition-colors font-semibold flex items-center justify-center">
-                            <i class="fas fa-share-alt mr-2"></i> Share
-                        </button>
-                    </div>
+            <!-- Results -->
+            <div id="result_section" class="hidden">
+                <h3 class="text-xl font-bold text-gray-900 mb-4">Top 3 Prediksi Tujuan</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4" id="top_predictions_grid">
+                    <!-- Results will be inserted here -->
                 </div>
             </div>
         </div>
@@ -357,80 +208,103 @@
 
 {% block extra_js %}
 <script>
-    // --- 1. GLOBAL VARIABLES ---
+    // Initialize map
     const map = L.map('map').setView([40.7580, -73.9855], 11);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-        attribution: '© OpenStreetMap contributors'
+        attribution: '© OpenStreetMap'
     }).addTo(map);
 
     let pickupMarker = null;
-    let clusterLayers = L.layerGroup().addTo(map);
+    let clusterLayers = null;
     let predictionMarkers = [];
-    let predictionAreas = [];
-    let showClusters = true;
+    let clusterAreas = [];
 
-    // Set default datetime to now
-    const now = new Date();
-    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-    document.getElementById('datetime').value = now.toISOString().slice(0, 16);
+    // Load clusters from JSON
+    const clusterData = {
+        "pickup_clusters": [
+            [40.712584223956, -73.99494070586509],      // Financial District
+            [40.76458624494709, -73.87699052727912],    // Queens Central
+            [40.79285681721363, -73.95391360756365],    // Upper Manhattan
+            [40.76640560775985, -73.9715164651916],     // Midtown Manhattan
+            [40.651514841924914, -73.78525769699498],   // Brooklyn Downtown
+            [40.74585022332249, -73.98994659096626]     // JFK/Outer Boroughs
+        ]
+    };
 
-    // --- 2. LOAD CLUSTERS ---
+    const clusterNames = [
+        {name: "Financial District", color: "#3B82F6", type: "Business"},
+        {name: "Queens Central", color: "#10B981", type: "Residential"},
+        {name: "Upper Manhattan", color: "#8B5CF6", type: "Upscale"},
+        {name: "Midtown Manhattan", color: "#EF4444", type: "Business/Tourism"},
+        {name: "Brooklyn Downtown", color: "#F59E0B", type: "Commercial"},
+        {name: "JFK/Outer Boroughs", color: "#EC4899", type: "Airport"}
+    ];
+
+    // Load clusters on map
     function loadClusters() {
-        fetch('/api/clusters')
-            .then(res => res.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    renderClusters(data.clusters);
-                }
-            })
-            .catch(err => console.error('Error loading clusters:', err));
-    }
-
-    function renderClusters(clusters) {
-        clusterLayers.clearLayers();
+        // Clear existing clusters
+        if (clusterLayers) {
+            map.removeLayer(clusterLayers);
+        }
         
-        clusters.forEach(cluster => {
-            // Add cluster area circle
-            const circle = L.circle(cluster.center, {
-                radius: cluster.radius * 1000, // Convert km to meters
-                color: cluster.color,
+        clusterLayers = L.layerGroup().addTo(map);
+        
+        clusterData.pickup_clusters.forEach((center, index) => {
+            const clusterInfo = clusterNames[index];
+            
+            // Add cluster area (2km radius)
+            const circle = L.circle(center, {
+                radius: 2000, // 2km
+                color: clusterInfo.color,
+                fillColor: clusterInfo.color,
+                fillOpacity: 0.1,
                 weight: 2,
-                fillColor: cluster.color,
-                fillOpacity: 0.15,
                 className: 'cluster-area'
-            });
+            }).addTo(clusterLayers);
+            
+            clusterAreas.push(circle);
             
             // Add cluster label
-            const label = L.marker(cluster.center, {
+            L.marker(center, {
                 icon: L.divIcon({
                     className: 'cluster-label',
                     html: `
-                        <div class="bg-white px-2 py-1 rounded-lg shadow-sm border border-gray-200 text-xs font-semibold" style="color: ${cluster.color}; border-left: 3px solid ${cluster.color}">
-                            ${cluster.name}
+                        <div class="bg-white px-3 py-1 rounded-lg shadow border text-xs font-semibold" 
+                             style="color: ${clusterInfo.color}; border-color: ${clusterInfo.color}">
+                            ${clusterInfo.name}
                         </div>
                     `,
-                    iconSize: [120, 40]
+                    iconSize: [120, 30]
                 })
-            });
-            
-            circle.bindPopup(`
-                <div class="p-2">
-                    <div class="font-bold text-lg mb-1" style="color: ${cluster.color}">${cluster.name}</div>
-                    <div class="text-sm text-gray-600 mb-2">${cluster.type}</div>
-                    <div class="text-xs text-gray-500 mb-2">${cluster.description || ''}</div>
-                    <div class="text-xs text-gray-500">
-                        Zone ID: ${cluster.id}<br>
-                        Radius: ${cluster.radius} km
-                    </div>
-                </div>
-            `);
-            
-            clusterLayers.addLayer(circle);
-            clusterLayers.addLayer(label);
+            }).addTo(clusterLayers);
         });
     }
 
-    // --- 3. MAP CLICK HANDLER ---
+    // Set current time
+    const now = new Date();
+    document.getElementById('hour').value = now.getHours();
+    document.getElementById('day').value = now.getDay() - 1;
+
+    // MARKER FUNCTIONS
+    function setPickupMarker(lat, lng) {
+        if (pickupMarker) map.removeLayer(pickupMarker);
+        
+        pickupMarker = L.marker([lat, lng], {
+            icon: L.divIcon({
+                className: 'pickup-marker',
+                html: '<div class="w-8 h-8 bg-green-500 rounded-full border-3 border-white shadow-lg"></div>',
+                iconSize: [32, 32]
+            })
+        }).addTo(map).bindPopup('<b>Lokasi Awal</b>');
+        
+        document.getElementById('pickup_lat').value = lat;
+        document.getElementById('pickup_lon').value = lng;
+        
+        // Center map on pickup
+        map.setView([lat, lng], 13);
+    }
+
+    // MAP CLICK HANDLER
     map.on('click', function(e) {
         const lat = e.latlng.lat;
         const lng = e.latlng.lng;
@@ -439,40 +313,9 @@
         reverseGeocode(lat, lng, 'pickup_input');
     });
 
-    // --- 4. MARKER FUNCTIONS ---
-    function setPickupMarker(lat, lng) {
-        if (pickupMarker) map.removeLayer(pickupMarker);
-        
-        pickupMarker = L.marker([lat, lng], {
-            icon: L.divIcon({
-                className: 'pickup-marker',
-                html: `
-                    <div class="relative">
-                        <div class="absolute -top-2 -left-2 bg-white rounded-full w-6 h-6 flex items-center justify-center shadow-md">
-                            <i class="fas fa-map-pin text-green-500 text-sm"></i>
-                        </div>
-                        <div class="w-8 h-8 bg-gradient-to-r from-green-400 to-green-500 rounded-full border-3 border-white shadow-lg"></div>
-                    </div>
-                `,
-                iconSize: [32, 32]
-            }),
-            draggable: true
-        }).addTo(map).bindPopup('<b>Pickup Location</b><br>Drag to adjust');
-        
-        document.getElementById('pickup_lat').value = lat;
-        document.getElementById('pickup_lon').value = lng;
-
-        pickupMarker.on('dragend', function(e) {
-            const pos = e.target.getLatLng();
-            document.getElementById('pickup_lat').value = pos.lat;
-            document.getElementById('pickup_lon').value = pos.lng;
-            reverseGeocode(pos.lat, pos.lng, 'pickup_input');
-        });
-    }
-
-    // --- 5. SEARCH FUNCTIONALITY ---
+    // SEARCH FUNCTIONALITY
     function searchLocation(query, resultElementId, inputElementId) {
-        if (query.length < 3) {
+        if (query.length < 2) {
             document.getElementById(resultElementId).style.display = 'none';
             return;
         }
@@ -486,7 +329,7 @@
                 if (data.length === 0) {
                     const item = document.createElement('div');
                     item.className = 'search-item text-gray-500 italic';
-                    item.innerText = 'No locations found in NYC';
+                    item.innerText = 'Lokasi tidak ditemukan';
                     list.appendChild(item);
                 } else {
                     data.forEach(item => {
@@ -513,7 +356,7 @@
             });
     }
 
-    // Event listeners
+    // Event listeners for search
     document.getElementById('pickup_input').addEventListener('input', (e) => {
         searchLocation(e.target.value, 'pickup_results', 'pickup_input');
     });
@@ -534,81 +377,42 @@
             });
     }
 
-    // --- 6. TIME PRESETS ---
-    function setTimePreset(preset) {
-        const now = new Date();
-        let hour;
-        
-        switch(preset) {
-            case 'morning':
-                hour = 8;
-                break;
-            case 'afternoon':
-                hour = 13;
-                break;
-            case 'evening':
-                hour = 18;
-                break;
-            default:
-                hour = now.getHours();
-        }
-        
-        now.setHours(hour, 0, 0, 0);
-        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-        document.getElementById('datetime').value = now.toISOString().slice(0, 16);
-        
-        showNotification(`Time set to ${hour}:00`);
-    }
-
-    // --- 7. CURRENT LOCATION ---
-    function useCurrentLocation() {
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    const lat = position.coords.latitude;
-                    const lng = position.coords.longitude;
-                    
-                    // Check if within NYC bounds
-                    if (lat > 40.4 && lat < 41 && lng > -74.3 && lng < -73.7) {
-                        setPickupMarker(lat, lng);
-                        reverseGeocode(lat, lng, 'pickup_input');
-                        map.setView([lat, lng], 14);
-                        showNotification('Your location found');
-                    } else {
-                        alert('You are outside NYC area. Please select a location on the map.');
-                    }
-                },
-                (error) => {
-                    alert('Cannot access your location. Please select a location on the map.');
-                }
-            );
-        } else {
-            alert('Browser does not support geolocation.');
-        }
-    }
-
-    // --- 8. PREDICTION FUNCTION ---
+    // PREDICTION FUNCTION
     function predictDestination() {
         const pLat = document.getElementById('pickup_lat').value;
         
         if (!pLat) {
-            showNotification('Please select a pickup location first!', 'error');
+            alert('Harap pilih lokasi awal terlebih dahulu!');
             return;
         }
 
+        const hour = parseInt(document.getElementById('hour').value);
+        const day = parseInt(document.getElementById('day').value);
+        const passengers = parseInt(document.getElementById('passengers').value);
+        
+        // Create datetime string
+        const now = new Date();
+        const datetime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, 0);
+        const datetimeStr = datetime.toISOString().slice(0, 16);
+
         // Show loading
         const predictBtn = document.getElementById('predictBtn');
-        predictBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Processing...';
+        const originalText = predictBtn.innerHTML;
+        predictBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Memproses...';
         predictBtn.disabled = true;
         
         document.getElementById('loading').classList.remove('hidden');
         document.getElementById('result_section').classList.add('hidden');
 
+        // Clear previous predictions
+        predictionMarkers.forEach(marker => map.removeLayer(marker));
+        predictionMarkers = [];
+
         const payload = {
             pickup_lat: pLat,
             pickup_lon: document.getElementById('pickup_lon').value,
-            datetime: document.getElementById('datetime').value,
-            passengers: parseInt(document.getElementById('passengers').value)
+            datetime: datetimeStr,
+            passengers: passengers
         };
 
         fetch('/api/predict_destination', {
@@ -619,297 +423,107 @@
         .then(res => res.json())
         .then(data => {
             // Reset button
-            predictBtn.innerHTML = '<i class="fas fa-search-location mr-3"></i><span>Predict Destination</span><i class="fas fa-arrow-right ml-2"></i>';
+            predictBtn.innerHTML = originalText;
             predictBtn.disabled = false;
             
             document.getElementById('loading').classList.add('hidden');
             
             if (data.status === 'success') {
-                // Clear previous predictions
-                clearPredictions();
-                
-                // Display results
+                // Display top 3 predictions
                 displayTopPredictions(data.top_predictions);
                 
-                // Update info
-                document.getElementById('pickup_zone').innerText = `${data.pickup_cluster_name} (Zone ${data.pickup_cluster})`;
-                document.getElementById('analysis_time').innerText = `${data.day_of_week}, ${data.hour}:00`;
-                document.getElementById('analysis_passengers').innerText = payload.passengers;
-                document.getElementById('model_type').innerText = data.model_info?.type || 'LightGBM';
-                
-                // Update confidence badge
-                const confidence = Math.max(...data.top_predictions.map(p => p.probability / 100));
-                const badge = document.getElementById('confidence_badge');
-                badge.className = `px-3 py-1 ${confidence >= 0.7 ? 'bg-green-100 text-green-800' : confidence >= 0.5 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'} rounded-full text-sm font-medium`;
-                badge.innerHTML = `<i class="fas ${confidence >= 0.7 ? 'fa-check-circle' : confidence >= 0.5 ? 'fa-exclamation-circle' : 'fa-times-circle'} mr-1"></i> ${confidence >= 0.7 ? 'High Accuracy' : confidence >= 0.5 ? 'Medium Accuracy' : 'Low Accuracy'}`;
-                
-                // Show results with animation
+                // Show result section
                 document.getElementById('result_section').classList.remove('hidden');
                 
-                // Scroll to results
-                document.getElementById('result_section').scrollIntoView({ behavior: 'smooth' });
-                
-                showNotification(`Top prediction: ${data.top_predictions[0].name} (${data.top_predictions[0].probability}%)`);
-                
+                // Add prediction markers to map
+                data.top_predictions.forEach((pred, index) => {
+                    addPredictionMarker(pred, index);
+                });
             } else {
-                showNotification('Error: ' + data.message, 'error');
+                alert('Error: ' + data.message);
             }
         })
         .catch(err => {
-            predictBtn.innerHTML = '<i class="fas fa-search-location mr-3"></i><span>Predict Destination</span><i class="fas fa-arrow-right ml-2"></i>';
+            predictBtn.innerHTML = originalText;
             predictBtn.disabled = false;
             document.getElementById('loading').classList.add('hidden');
-            showNotification('Connection to server failed. Please try again.', 'error');
+            alert('Koneksi gagal. Silakan coba lagi.');
             console.error(err);
         });
     }
 
-    // --- 9. DISPLAY PREDICTIONS ---
+    // DISPLAY PREDICTIONS
     function displayTopPredictions(predictions) {
         const container = document.getElementById('top_predictions_grid');
         container.innerHTML = '';
         
+        const rankColors = ['#EF4444', '#3B82F6', '#F59E0B'];
+        const rankIcons = ['fa-crown', 'fa-medal', 'fa-award'];
+        
         predictions.forEach((pred, index) => {
-            const rankColors = ['bg-gradient-to-r from-yellow-500 to-orange-500', 'bg-gradient-to-r from-blue-500 to-cyan-500', 'bg-gradient-to-r from-green-500 to-emerald-500'];
-            const rankIcons = ['fa-crown', 'fa-medal', 'fa-award'];
-            
             const card = document.createElement('div');
-            card.className = 'prediction-card bg-white rounded-xl p-5 shadow-md border border-gray-100';
-            card.style.borderLeftColor = pred.color;
+            card.className = 'prediction-card bg-white rounded-xl p-5 shadow border border-gray-100';
+            card.style.borderLeftColor = rankColors[index];
+            
             card.innerHTML = `
-                <div class="flex justify-between items-start mb-4">
+                <div class="flex items-start justify-between mb-3">
                     <div class="flex items-center">
-                        <div class="${rankColors[index]} text-white rounded-lg p-2 mr-3">
-                            <i class="fas ${rankIcons[index]} text-lg"></i>
+                        <div class="rank-badge mr-3" style="background-color: ${rankColors[index]}">
+                            ${index + 1}
                         </div>
                         <div>
-                            <h3 class="font-bold text-gray-900">${pred.name}</h3>
+                            <h4 class="font-bold text-gray-900">${pred.name}</h4>
                             <p class="text-sm text-gray-600">${pred.type}</p>
                         </div>
                     </div>
                     <div class="text-right">
-                        <div class="text-2xl font-bold text-gray-900">${pred.probability}%</div>
-                        <div class="text-xs px-2 py-1 rounded-full ${pred.confidence === 'Very High' ? 'bg-green-100 text-green-800' : pred.confidence === 'High' ? 'bg-blue-100 text-blue-800' : pred.confidence === 'Medium' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}">
-                            ${pred.confidence}
+                        <div class="text-xl font-bold" style="color: ${rankColors[index]}">
+                            ${pred.probability}%
                         </div>
+                        <div class="text-xs text-gray-500">probabilitas</div>
                     </div>
                 </div>
                 
-                <div class="space-y-2 mb-4">
-                    <div class="flex justify-between text-sm">
-                        <span class="text-gray-500">Zone ID:</span>
-                        <span class="font-semibold">${pred.cluster}</span>
-                    </div>
-                    <div class="flex justify-between text-sm">
-                        <span class="text-gray-500">Coordinates:</span>
-                        <span class="font-mono text-xs">${pred.center[0].toFixed(4)}, ${pred.center[1].toFixed(4)}</span>
-                    </div>
-                    <p class="text-xs text-gray-500 mt-2">${pred.description || 'Popular destination zone'}</p>
+                <div class="text-sm text-gray-600 mb-4">
+                    ${pred.description || 'Zona tujuan populer'}
                 </div>
                 
-                <div class="flex space-x-2">
-                    <button onclick="focusOnPrediction(${index}, ${pred.cluster}, [${pred.center}], '${pred.color}')" 
-                            class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center">
-                        <i class="fas fa-map-marker-alt mr-2"></i> View on Map
-                    </button>
-                    <button onclick="showZoneDetails(${pred.cluster})" 
-                            class="flex-1 bg-blue-50 hover:bg-blue-100 text-blue-700 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center">
-                        <i class="fas fa-info-circle mr-2"></i> Details
-                    </button>
+                <div class="flex items-center justify-between text-sm text-gray-500">
+                    <span>Zona ${pred.cluster}</span>
+                    <span>${pred.center[0].toFixed(4)}, ${pred.center[1].toFixed(4)}</span>
                 </div>
             `;
-            container.appendChild(card);
             
-            // Add prediction marker to map
-            addPredictionMarker(pred, index);
+            container.appendChild(card);
         });
     }
 
     function addPredictionMarker(prediction, rank) {
+        const colors = ['#EF4444', '#3B82F6', '#F59E0B'];
+        
         const marker = L.marker(prediction.center, {
             icon: L.divIcon({
                 className: `prediction-marker rank-${rank}`,
                 html: `
                     <div class="relative">
-                        <div class="absolute -top-2 -left-2 bg-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold shadow-md border" style="border-color: ${prediction.color}">
+                        <div class="w-10 h-10 rounded-full border-3 border-white shadow-lg flex items-center justify-center text-white font-bold"
+                             style="background-color: ${colors[rank]}">
                             ${rank + 1}
-                        </div>
-                        <div class="w-8 h-8 rounded-full border-3 border-white shadow-lg" style="background-color: ${prediction.color}">
-                            <div class="w-full h-full flex items-center justify-center text-white text-xs font-bold">
-                                ${Math.round(prediction.probability)}%
-                            </div>
                         </div>
                     </div>
                 `,
-                iconSize: [32, 32]
+                iconSize: [40, 40]
             })
         }).addTo(map).bindPopup(`
             <div class="p-2">
-                <div class="font-bold text-lg mb-1" style="color: ${prediction.color}">${prediction.name}</div>
-                <div class="text-sm text-gray-600 mb-2">Rank: <span class="font-bold">#${rank + 1}</span></div>
-                <div class="text-sm text-gray-600 mb-2">Probability: <span class="font-bold">${prediction.probability}%</span></div>
-                <div class="text-xs text-gray-500 mb-1">${prediction.type}</div>
-                <div class="text-xs text-gray-400">${prediction.description || ''}</div>
+                <div class="font-bold mb-1" style="color: ${colors[rank]}">${prediction.name}</div>
+                <div class="text-sm">Peringkat: #${rank + 1}</div>
+                <div class="text-sm">Probabilitas: ${prediction.probability}%</div>
             </div>
         `);
         
         predictionMarkers.push(marker);
-        
-        // Add area circle for main prediction (rank 0)
-        if (rank === 0) {
-            const area = L.circle(prediction.center, {
-                radius: 1500, // 1.5km radius
-                color: prediction.color,
-                weight: 2,
-                fillColor: prediction.color,
-                fillOpacity: 0.15,
-                className: 'prediction-area'
-            }).addTo(map);
-            predictionAreas.push(area);
-        }
     }
-
-    // --- 10. HELPER FUNCTIONS ---
-    function focusOnPrediction(rank, clusterId, coords, color) {
-        if (pickupMarker) {
-            const bounds = L.latLngBounds([
-                pickupMarker.getLatLng(),
-                coords
-            ]);
-            map.fitBounds(bounds, { padding: [100, 100] });
-        } else {
-            map.setView(coords, 14);
-        }
-        
-        // Highlight the selected prediction
-        predictionMarkers.forEach((marker, index) => {
-            if (index === rank) {
-                marker.openPopup();
-            }
-        });
-        
-        showNotification(`Focused on prediction #${rank + 1}: ${clusterId}`);
-    }
-
-    function showZoneDetails(clusterId) {
-        // You can implement a modal or detailed view here
-        showNotification(`Details for zone ${clusterId} will be displayed.`);
-    }
-
-    function clearPredictions() {
-        predictionMarkers.forEach(marker => map.removeLayer(marker));
-        predictionAreas.forEach(area => map.removeLayer(area));
-        predictionMarkers = [];
-        predictionAreas = [];
-    }
-
-    function clearMap() {
-        if (pickupMarker) {
-            map.removeLayer(pickupMarker);
-            pickupMarker = null;
-        }
-        clearPredictions();
-        document.getElementById('pickup_input').value = '';
-        document.getElementById('pickup_lat').value = '';
-        document.getElementById('pickup_lon').value = '';
-        document.getElementById('result_section').classList.add('hidden');
-        showNotification('Map cleared');
-    }
-
-    function toggleClusters() {
-        showClusters = !showClusters;
-        const btn = document.getElementById('toggleClustersBtn');
-        
-        if (showClusters) {
-            clusterLayers.addTo(map);
-            btn.innerHTML = '<i class="fas fa-eye-slash mr-2"></i> Hide Zones';
-            btn.classList.remove('bg-gray-600');
-            btn.classList.add('bg-blue-600');
-        } else {
-            map.removeLayer(clusterLayers);
-            btn.innerHTML = '<i class="fas fa-eye mr-2"></i> Show Zones';
-            btn.classList.remove('bg-blue-600');
-            btn.classList.add('bg-gray-600');
-        }
-    }
-
-    function exportAnalysis() {
-        const data = {
-            timestamp: new Date().toISOString(),
-            pickup_location: document.getElementById('pickup_input').value,
-            pickup_coords: [document.getElementById('pickup_lat').value, document.getElementById('pickup_lon').value],
-            analysis_time: document.getElementById('datetime').value,
-            passengers: document.getElementById('passengers').value,
-            model: 'LightGBM',
-            unified_clusters: true
-        };
-        
-        const dataStr = JSON.stringify(data, null, 2);
-        const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
-        
-        const exportFileDefaultName = `nyc-taxi-destination-${Date.now()}.json`;
-        
-        const linkElement = document.createElement('a');
-        linkElement.setAttribute('href', dataUri);
-        linkElement.setAttribute('download', exportFileDefaultName);
-        linkElement.click();
-        
-        showNotification('Data exported successfully');
-    }
-
-    function shareResults() {
-        if (navigator.share) {
-            navigator.share({
-                title: 'NYC Taxi - Destination Prediction',
-                text: 'I just analyzed NYC taxi destination patterns using AI',
-                url: window.location.href
-            });
-        } else {
-            navigator.clipboard.writeText(window.location.href);
-            showNotification('Link copied to clipboard!');
-        }
-    }
-
-    function showNotification(message, type = 'success') {
-        const notification = document.createElement('div');
-        notification.className = `fixed top-4 right-4 ${type === 'error' ? 'bg-red-500' : 'bg-green-500'} text-white px-4 py-3 rounded-xl shadow-lg z-50 transform translate-x-full animate-slide-in max-w-sm`;
-        notification.innerHTML = `
-            <div class="flex items-center">
-                <i class="fas ${type === 'error' ? 'fa-exclamation-circle' : 'fa-check-circle'} mr-3 text-lg"></i>
-                <span class="text-sm">${message}</span>
-            </div>
-        `;
-        document.body.appendChild(notification);
-        
-        setTimeout(() => {
-            notification.classList.remove('animate-slide-in');
-            notification.classList.add('animate-slide-out');
-            setTimeout(() => notification.remove(), 300);
-        }, 3000);
-    }
-
-    // Add CSS animations
-    const style = document.createElement('style');
-    style.textContent = `
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fadeIn {
-            animation: fadeIn 0.5s ease-out;
-        }
-        @keyframes slide-in {
-            from { transform: translateX(100%); }
-            to { transform: translateX(0); }
-        }
-        @keyframes slide-out {
-            from { transform: translateX(0); }
-            to { transform: translateX(100%); }
-        }
-        .animate-slide-in { animation: slide-in 0.3s forwards; }
-        .animate-slide-out { animation: slide-out 0.3s forwards; }
-    `;
-    document.head.appendChild(style);
 
     // Initialize
     setTimeout(() => {
