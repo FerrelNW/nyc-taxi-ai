@@ -12,12 +12,28 @@
         body { font-family: 'Segoe UI', system-ui, sans-serif; }
         .leaflet-container { font-family: inherit; }
         .glass-card {
-            background: rgba(255, 255, 255, 0.9);
+            background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
         }
         .shadow-soft {
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        }
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #a1a1a1;
         }
     </style>
     
@@ -61,10 +77,23 @@
             <div class="text-center text-gray-500 text-sm">
                 <p>NYC Taxi Intelligence System © 2025</p>
                 <p class="mt-1">Powered by Flask, Leaflet.js, and Machine Learning Models</p>
-                <div class="mt-4 flex justify-center space-x-4">
-                    <a href="#" class="text-gray-400 hover:text-blue-500"><i class="fab fa-github"></i></a>
-                    <a href="#" class="text-gray-400 hover:text-blue-500"><i class="fab fa-python"></i></a>
-                    <a href="#" class="text-gray-400 hover:text-blue-500"><i class="fab fa-js-square"></i></a>
+                <div class="mt-4 flex justify-center space-x-6">
+                    <a href="#" class="text-gray-400 hover:text-blue-500">
+                        <i class="fab fa-github"></i>
+                        <span class="ml-1">GitHub</span>
+                    </a>
+                    <a href="#" class="text-gray-400 hover:text-green-500">
+                        <i class="fab fa-python"></i>
+                        <span class="ml-1">Python</span>
+                    </a>
+                    <a href="#" class="text-gray-400 hover:text-yellow-500">
+                        <i class="fab fa-js-square"></i>
+                        <span class="ml-1">JavaScript</span>
+                    </a>
+                    <a href="/test" class="text-gray-400 hover:text-purple-500">
+                        <i class="fas fa-layer-group"></i>
+                        <span class="ml-1">Cluster Visualization</span>
+                    </a>
                 </div>
             </div>
         </div>

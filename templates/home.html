@@ -14,37 +14,37 @@
 
     <!-- Stats Overview -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-        <div class="glass-card rounded-xl p-6 shadow-soft">
+        <div class="glass-card rounded-xl p-6 shadow-soft hover:shadow-lg transition-all duration-300">
             <div class="flex items-center">
                 <div class="bg-blue-100 p-3 rounded-lg">
                     <i class="fas fa-clock text-2xl text-blue-600"></i>
                 </div>
                 <div class="ml-4">
                     <h3 class="text-lg font-semibold text-gray-800">Estimasi Akurat</h3>
-                    <p class="text-gray-500">Model XGBoost terlatih</p>
+                    <p class="text-gray-500">Model XGBoost dengan 10 zona</p>
                 </div>
             </div>
         </div>
         
-        <div class="glass-card rounded-xl p-6 shadow-soft">
+        <div class="glass-card rounded-xl p-6 shadow-soft hover:shadow-lg transition-all duration-300">
             <div class="flex items-center">
                 <div class="bg-purple-100 p-3 rounded-lg">
                     <i class="fas fa-map-marked-alt text-2xl text-purple-600"></i>
                 </div>
                 <div class="ml-4">
                     <h3 class="text-lg font-semibold text-gray-800">Prediksi Tujuan</h3>
-                    <p class="text-gray-500">Analisis pola perjalanan</p>
+                    <p class="text-gray-500">LightGBM dengan 3 prediksi teratas</p>
                 </div>
             </div>
         </div>
         
-        <div class="glass-card rounded-xl p-6 shadow-soft">
+        <div class="glass-card rounded-xl p-6 shadow-soft hover:shadow-lg transition-all duration-300">
             <div class="flex items-center">
                 <div class="bg-green-100 p-3 rounded-lg">
-                    <i class="fas fa-brain text-2xl text-green-600"></i>
+                    <i class="fas fa-layer-group text-2xl text-green-600"></i>
                 </div>
                 <div class="ml-4">
-                    <h3 class="text-lg font-semibold text-gray-800">AI Powered</h3>
+                    <h3 class="text-lg font-semibold text-gray-800">10 Zona NYC</h3>
                     <p class="text-gray-500">K-Means clustering</p>
                 </div>
             </div>
@@ -79,9 +79,9 @@
                     <div class="bg-purple-100 p-4 rounded-2xl mb-6 group-hover:bg-purple-200 transition-colors">
                         <i class="fas fa-map-marked-alt text-5xl text-purple-600"></i>
                     </div>
-                    <h2 class="text-2xl font-bold text-gray-800 mb-3">Analisa Pola Tujuan</h2>
+                    <h2 class="text-2xl font-bold text-gray-800 mb-3">Analisa Pola Tujuan</h3>
                     <p class="text-gray-600 mb-6">
-                        AI memprediksi zona tujuan yang paling mungkin berdasarkan lokasi penjemputan dan waktu. Cocok untuk analisis pola perjalanan.
+                        Prediksi 3 zona tujuan paling mungkin berdasarkan lokasi penjemputan dan waktu. Model LightGBM dengan 10 zona kluster.
                     </p>
                     <div class="flex items-center text-purple-600 font-medium">
                         <span>Analisis Sekarang</span>
@@ -97,26 +97,34 @@
         <h2 class="text-2xl font-bold text-gray-800 mb-8 text-center">Cara Kerja Sistem</h2>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div class="text-center">
-                <div class="bg-gray-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <span class="text-lg font-bold text-gray-700">1</span>
+                <div class="bg-blue-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="fas fa-map-marker-alt text-blue-600 text-lg"></i>
                 </div>
                 <h3 class="font-semibold text-gray-800 mb-2">Input Data</h3>
                 <p class="text-gray-600 text-sm">Masukkan lokasi dan waktu melalui peta interaktif</p>
             </div>
             <div class="text-center">
-                <div class="bg-gray-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <span class="text-lg font-bold text-gray-700">2</span>
+                <div class="bg-green-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="fas fa-brain text-green-600 text-lg"></i>
                 </div>
                 <h3 class="font-semibold text-gray-800 mb-2">Proses AI</h3>
                 <p class="text-gray-600 text-sm">Model Machine Learning menganalisis pola dan memprediksi</p>
             </div>
             <div class="text-center">
-                <div class="bg-gray-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <span class="text-lg font-bold text-gray-700">3</span>
+                <div class="bg-purple-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="fas fa-chart-line text-purple-600 text-lg"></i>
                 </div>
                 <h3 class="font-semibold text-gray-800 mb-2">Hasil Visual</h3>
                 <p class="text-gray-600 text-sm">Lihat hasil prediksi dalam peta dan statistik detail</p>
             </div>
+        </div>
+        
+        <div class="mt-8 pt-8 border-t border-gray-200 text-center">
+            <a href="/test" class="inline-flex items-center text-gray-600 hover:text-purple-600 font-medium">
+                <i class="fas fa-layer-group mr-2"></i>
+                <span>Lihat Visualisasi 10 Zona Taksi NYC</span>
+                <i class="fas fa-external-link-alt ml-2 text-sm"></i>
+            </a>
         </div>
     </div>
 </div>

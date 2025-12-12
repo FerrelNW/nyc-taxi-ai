@@ -175,8 +175,6 @@ def get_confidence_label(probability):
     else:
         return "Low"
 
-from datetime import datetime  # Pastikan ini sudah di import
-
 # --- ROUTES ---
 @app.route('/')
 def home():
@@ -194,6 +192,10 @@ def destination_page():
     now = datetime.now()
     return render_template('destination.html', now=now)
 
+@app.route('/test')
+def cluster_visualization():
+    """Cluster visualization page"""
+    return render_template('cluster_visualization.html')
 
 # --- API ENDPOINTS ---
 @app.route('/api/clusters', methods=['GET'])
@@ -338,7 +340,7 @@ def predict_destination():
         # NEW K-Means Clustering for pickup (10 clusters)
         p_cluster = models['kmeans'].predict([[p_lat, p_lon]])[0]
         
-        # Prepare input for NEW LightGBM model
+        # Prepare input for NEW LightGBM model - FIX CATEGORICAL FEATURE MISMATCH
         input_data = {
             'pickup_longitude': p_lon,
             'pickup_latitude': p_lat,
@@ -355,15 +357,28 @@ def predict_destination():
             'month_cos': m_cos
         }
         
-        # Add placeholder features if needed
+        # Create DataFrame with all required features
         df_in = pd.DataFrame([input_data])
+        
+        # Ensure all features from training are present
         for f in models['feat_dest']:
             if f not in df_in.columns:
-                df_in[f] = 0
+                # Add missing features with default values
+                if f in ['pickup_cluster', 'day_of_week_idx', 'passenger_count']:
+                    df_in[f] = 0  # Default for categorical-like
+                else:
+                    df_in[f] = 0.0  # Default for numerical
         
-        # Get TOP 3 predictions with probabilities
+        # Ensure pickup_cluster is treated as categorical
+        if 'pickup_cluster' in models['feat_dest']:
+            df_in['pickup_cluster'] = df_in['pickup_cluster'].astype('category')
+        
+        # Get predictions
         try:
+            # Get probabilities for all classes
             probabilities = models['lgb_dest'].predict_proba(df_in[models['feat_dest']])[0]
+            
+            # Get top 3 predictions
             top_3_indices = np.argsort(probabilities)[-3:][::-1]
             top_3_predictions = []
             
@@ -384,7 +399,7 @@ def predict_destination():
             
         except Exception as e:
             print(f"LightGBM prediction error: {e}")
-            # Fallback: return top cluster
+            # Fallback: return top cluster with high probability
             pred_cluster = models['lgb_dest'].predict(df_in[models['feat_dest']])[0]
             cluster_info = models['cluster_centroids'][pred_cluster]
             
@@ -422,6 +437,8 @@ def predict_destination():
         
     except Exception as e:
         print(f"Error in predict_destination: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @app.route('/api/search', methods=['GET'])
@@ -481,6 +498,35 @@ def get_route():
         
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/search', methods=['GET'])
+def search_location():
+    """Search for locations in NYC area"""
+    query = request.args.get('q', '')
+    limit = int(request.args.get('limit', 10))
+    
+    if len(query) < 2:
+        return jsonify([])
+    
+    try:
+        # Focus search on NYC area
+        url = f'https://nominatim.openstreetmap.org/search?format=json&q={query}&viewbox=-74.25,40.49,-73.70,40.91&bounded=1&limit={limit}'
+        headers = {'User-Agent': 'NYC-Taxi-App/1.0'}
+        response = requests.get(url, headers=headers, timeout=5)
+        data = response.json()
+        
+        results = []
+        for item in data[:limit]:
+            results.append({
+                'display_name': item['display_name'],
+                'lat': float(item['lat']),
+                'lon': float(item['lon'])
+            })
+        return jsonify(results)
+    except Exception as e:
+        print(f"Search error: {e}")
+        return jsonify([])
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
