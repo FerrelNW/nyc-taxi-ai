@@ -4,6 +4,9 @@ from flask import Flask, render_template, request, jsonify
 import joblib
 import math
 from datetime import datetime
+import json
+import os
+import requests
 
 app = Flask(__name__)
 
@@ -11,22 +14,89 @@ app = Flask(__name__)
 MODEL_PATH = 'models/'
 models = {}
 
+# NYC Cluster names for 6 clusters with user-friendly names
+CLUSTER_NAMES = {
+    0: {
+        "name": "Financial District", 
+        "type": "Business/Finance", 
+        "color": "#3B82F6",
+        "description": "Wall Street, World Trade Center, Battery Park"
+    },
+    1: {
+        "name": "Queens Central", 
+        "type": "Residential/Transport", 
+        "color": "#10B981",
+        "description": "Astoria, Long Island City, residential areas"
+    },
+    2: {
+        "name": "Upper Manhattan", 
+        "type": "Upscale Residential", 
+        "color": "#8B5CF6",
+        "description": "Upper West Side, Upper East Side near Central Park"
+    },
+    3: {
+        "name": "Midtown Manhattan", 
+        "type": "Business/Tourism", 
+        "color": "#EF4444",
+        "description": "Times Square, Theater District, Grand Central"
+    },
+    4: {
+        "name": "Brooklyn Downtown", 
+        "type": "Residential/Commercial", 
+        "color": "#F59E0B",
+        "description": "Downtown Brooklyn, Barclays Center area"
+    },
+    5: {
+        "name": "JFK/Outer Boroughs", 
+        "type": "Airport/Transport", 
+        "color": "#EC4899",
+        "description": "JFK Airport, outer borough connections"
+    }
+}
+
 def load_models():
+    """Load all ML models and cluster data"""
     try:
+        # Model 1: Duration Prediction
         models['xgb_duration'] = joblib.load(MODEL_PATH + 'xgb_problem1_final.pkl')
         models['feat_duration'] = joblib.load(MODEL_PATH + 'features_problem1_final.pkl')
-        models['rf_dest'] = joblib.load(MODEL_PATH + 'best_model_problem2.pkl') 
+        
+        # Model 2: Destination Prediction (LightGBM)
+        models['lgb_dest'] = joblib.load(MODEL_PATH + 'best_model_problem2.pkl')
         models['feat_dest'] = joblib.load(MODEL_PATH + 'features_problem2_final.pkl')
-        models['kmeans_pickup'] = joblib.load(MODEL_PATH + 'kmeans_pickup.pkl')
-        models['kmeans_dropoff'] = joblib.load(MODEL_PATH + 'kmeans_dropoff.pkl')
-        print("✅ Semua model berhasil dimuat.")
+        
+        # Unified Clustering Model
+        models['kmeans'] = joblib.load(MODEL_PATH + 'kmeans_pickup.pkl')
+        
+        # Load cluster centroids from JSON
+        with open(MODEL_PATH + 'cluster_centroids.json', 'r') as f:
+            cluster_data = json.load(f)
+        
+        # Process unified centroids (both pickup and dropoff have same coordinates)
+        models['cluster_centroids'] = []
+        # Assuming both arrays are identical, use pickup_clusters
+        for i, centroid in enumerate(cluster_data['pickup_clusters']):
+            models['cluster_centroids'].append({
+                'id': i,
+                'coordinates': centroid,
+                'name': CLUSTER_NAMES[i]['name'],
+                'type': CLUSTER_NAMES[i]['type'],
+                'color': CLUSTER_NAMES[i]['color']
+            })
+        
+        print("✅ All models loaded successfully")
+        print(f"✅ Destination model: {type(models['lgb_dest']).__name__}")
+        print(f"✅ Unified clusters: {len(models['cluster_centroids'])} zones")
+        
     except Exception as e:
         print(f"❌ Error loading models: {e}")
+        raise e
 
 load_models()
 
 # --- MATH FUNCTIONS ---
 def calculate_haversine(lat1, lon1, lat2, lon2):
+    """Calculate distance between two points in kilometers"""
     R = 6371
     dlat = math.radians(lat2 - lat1)
     dlon = math.radians(lon2 - lon1)
@@ -35,6 +105,7 @@ def calculate_haversine(lat1, lon1, lat2, lon2):
     return R * c
 
 def calculate_bearing(lat1, lon1, lat2, lon2):
+    """Calculate bearing between two points"""
     dLon = math.radians(lon2 - lon1)
     lat1 = math.radians(lat1)
     lat2 = math.radians(lat2)
@@ -42,6 +113,17 @@ def calculate_bearing(lat1, lon1, lat2, lon2):
     x = math.cos(lat1) * math.sin(lat2) - math.sin(lat1) * math.cos(lat2) * math.cos(dLon)
     brng = math.degrees(math.atan2(y, x))
     return (brng + 360) % 360
+
+def get_confidence_label(probability):
+    """Get confidence label based on probability"""
+    if probability >= 0.8:
+        return "Very High"
+    elif probability >= 0.6:
+        return "High"
+    elif probability >= 0.4:
+        return "Medium"
+    else:
+        return "Low"
 
 # --- ROUTES ---
 @app.route('/')
@@ -57,8 +139,31 @@ def destination_page():
     return render_template('destination.html')
 
 # --- API ENDPOINTS ---
+@app.route('/api/clusters', methods=['GET'])
+def get_clusters():
+    """Return cluster information for map visualization"""
+    try:
+        clusters = []
+        for cluster in models['cluster_centroids']:
+            cluster_info = {
+                'id': cluster['id'],
+                'center': cluster['coordinates'],
+                'name': cluster['name'],
+                'type': cluster['type'],
+                'color': cluster['color'],
+                'radius': 1.5,  # km
+                'description': CLUSTER_NAMES.get(cluster['id'], {}).get('description', '')
+            }
+            clusters.append(cluster_info)
+        
+        return jsonify({'status': 'success', 'clusters': clusters})
+    
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 400
+
 @app.route('/api/predict_duration', methods=['POST'])
 def predict_duration():
+    """Predict travel duration between two points"""
     try:
         data = request.json
         p_lat = float(data['pickup_lat'])
@@ -79,7 +184,7 @@ def predict_duration():
         month = dt.month
         day = dt.weekday()
         is_weekend = 1 if day >= 5 else 0
-        is_rush = 1 if hour in [8,9,10,15,16,17,18] else 0
+        is_rush = 1 if hour in [7, 8, 9, 16, 17, 18, 19] else 0
         
         # Cyclical Features
         h_sin = np.sin(2 * np.pi * hour / 24)
@@ -87,9 +192,9 @@ def predict_duration():
         m_sin = np.sin(2 * np.pi * month / 12)
         m_cos = np.cos(2 * np.pi * month / 12)
         
-        # Clustering
-        p_cluster = models['kmeans_pickup'].predict([[p_lat, p_lon]])[0]
-        d_cluster = models['kmeans_dropoff'].predict([[d_lat, d_lon]])[0]
+        # Unified Clustering
+        p_cluster = models['kmeans'].predict([[p_lat, p_lon]])[0]
+        d_cluster = models['kmeans'].predict([[d_lat, d_lon]])[0]
 
         # Prepare input for Model 1
         input_data = {
@@ -122,14 +227,28 @@ def predict_duration():
         log_dur = models['xgb_duration'].predict(df_in[feat_1])[0]
         duration_minutes = round(np.expm1(log_dur), 0)
         
+        # Get cluster info
+        pickup_cluster_info = models['cluster_centroids'][p_cluster]
+        dropoff_cluster_info = models['cluster_centroids'][d_cluster]
+        
         return jsonify({
             'status': 'success',
             'duration_minutes': int(duration_minutes),
             'distance_km': round(dist_km, 2),
             'pickup_cluster': int(p_cluster),
+            'pickup_cluster_name': pickup_cluster_info['name'],
+            'pickup_cluster_color': pickup_cluster_info['color'],
             'dropoff_cluster': int(d_cluster),
+            'dropoff_cluster_name': dropoff_cluster_info['name'],
+            'dropoff_cluster_color': dropoff_cluster_info['color'],
             'pickup_coords': [p_lat, p_lon],
-            'dropoff_coords': [d_lat, d_lon]
+            'dropoff_coords': [d_lat, d_lon],
+            'time_info': {
+                'hour': hour,
+                'day': ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][day],
+                'is_rush_hour': bool(is_rush),
+                'is_weekend': bool(is_weekend)
+            }
         })
         
     except Exception as e:
@@ -137,6 +256,7 @@ def predict_duration():
 
 @app.route('/api/predict_destination', methods=['POST'])
 def predict_destination():
+    """Predict top 3 destination clusters based on pickup location"""
     try:
         data = request.json
         p_lat = float(data['pickup_lat'])
@@ -145,12 +265,12 @@ def predict_destination():
         
         dt = datetime.strptime(data['datetime'], '%Y-%m-%dT%H:%M')
         
-        # Feature Engineering for Model 2
+        # Feature Engineering
         hour = dt.hour
         month = dt.month
         day = dt.weekday()
         is_weekend = 1 if day >= 5 else 0
-        is_rush = 1 if hour in [8,9,10,15,16,17,18] else 0
+        is_rush = 1 if hour in [7, 8, 9, 16, 17, 18, 19] else 0
         
         # Cyclical Features
         h_sin = np.sin(2 * np.pi * hour / 24)
@@ -158,10 +278,10 @@ def predict_destination():
         m_sin = np.sin(2 * np.pi * month / 12)
         m_cos = np.cos(2 * np.pi * month / 12)
         
-        # Clustering
-        p_cluster = models['kmeans_pickup'].predict([[p_lat, p_lon]])[0]
+        # Unified Clustering for pickup
+        p_cluster = models['kmeans'].predict([[p_lat, p_lon]])[0]
         
-        # Prepare input for Model 2
+        # Prepare input for LightGBM model
         input_data = {
             'pickup_longitude': p_lon,
             'pickup_latitude': p_lat,
@@ -178,119 +298,131 @@ def predict_destination():
             'month_cos': m_cos
         }
         
-        # Add placeholder features for Model 2 if needed
+        # Add placeholder features if needed
         df_in = pd.DataFrame([input_data])
         for f in models['feat_dest']:
             if f not in df_in.columns:
                 df_in[f] = 0
         
-        # Get TOP 3 predictions with probabilities (if model supports predict_proba)
+        # Get TOP 3 predictions with probabilities
         try:
-            # Try to get probabilities if model supports it
-            probabilities = models['rf_dest'].predict_proba(df_in[models['feat_dest']])[0]
-            top_3_indices = np.argsort(probabilities)[-3:][::-1]  # Top 3 descending
+            probabilities = models['lgb_dest'].predict_proba(df_in[models['feat_dest']])[0]
+            top_3_indices = np.argsort(probabilities)[-3:][::-1]
             top_3_predictions = []
             
             for idx in top_3_indices:
                 prob = float(probabilities[idx])
+                cluster_info = models['cluster_centroids'][idx]
+                
                 top_3_predictions.append({
                     'cluster': int(idx),
+                    'name': cluster_info['name'],
+                    'type': cluster_info['type'],
+                    'color': cluster_info['color'],
                     'probability': round(prob * 100, 1),
-                    'confidence': get_confidence_label(prob)
+                    'confidence': get_confidence_label(prob),
+                    'center': cluster_info['coordinates'],
+                    'description': CLUSTER_NAMES[idx]['description']
                 })
             
-        except:
-            # Fallback: If model doesn't support predict_proba, just get top 1
-            pred_cluster = models['rf_dest'].predict(df_in[models['feat_dest']])[0]
+        except Exception as e:
+            print(f"LightGBM prediction error: {e}")
+            # Fallback: return top cluster
+            pred_cluster = models['lgb_dest'].predict(df_in[models['feat_dest']])[0]
+            cluster_info = models['cluster_centroids'][pred_cluster]
+            
             top_3_predictions = [{
                 'cluster': int(pred_cluster),
+                'name': cluster_info['name'],
+                'type': cluster_info['type'],
+                'color': cluster_info['color'],
                 'probability': 85.0,
-                'confidence': 'Tinggi'
+                'confidence': 'High',
+                'center': cluster_info['coordinates'],
+                'description': CLUSTER_NAMES[pred_cluster]['description']
             }]
         
-        # Map clusters to real NYC locations
-        cluster_locations = {
-            0: {"name": "Times Square Area", "coords": [40.7580, -73.9855], "type": "Hiburan"},
-            1: {"name": "Financial District", "coords": [40.7075, -74.0113], "type": "Bisnis"},
-            2: {"name": "Upper East Side", "coords": [40.7736, -73.9566], "type": "Permukiman"},
-            3: {"name": "Chelsea/Meatpacking", "coords": [40.7420, -74.0048], "type": "Hiburan"},
-            4: {"name": "Williamsburg", "coords": [40.7081, -73.9571], "type": "Hipster Area"},
-            5: {"name": "Astoria", "coords": [40.7644, -73.9235], "type": "Permukiman"},
-            6: {"name": "Harlem", "coords": [40.8116, -73.9465], "type": "Permukiman"},
-            7: {"name": "JFK Airport", "coords": [40.6413, -73.7781], "type": "Transportasi"},
-            8: {"name": "LaGuardia Airport", "coords": [40.7769, -73.8740], "type": "Transportasi"},
-            9: {"name": "Brooklyn Heights", "coords": [40.6953, -73.9965], "type": "Permukiman"},
-            10: {"name": "SoHo", "coords": [40.7233, -74.0030], "type": "Belanja"},
-            11: {"name": "Greenwich Village", "coords": [40.7336, -74.0027], "type": "Hiburan"},
-            12: {"name": "Midtown East", "coords": [40.7549, -73.9840], "type": "Bisnis"},
-            13: {"name": "Upper West Side", "coords": [40.7870, -73.9754], "type": "Permukiman"},
-            14: {"name": "Long Island City", "coords": [40.7447, -73.9485], "type": "Permukiman"}
-        }
-        
-        # Enhance predictions with location data
-        enhanced_predictions = []
-        for pred in top_3_predictions:
-            cluster_id = pred['cluster']
-            location_info = cluster_locations.get(cluster_id, {
-                "name": f"Zona {cluster_id}",
-                "coords": [40.7580, -73.9855],
-                "type": "Unknown"
-            })
-            
-            enhanced_predictions.append({
-                **pred,
-                "location_name": location_info["name"],
-                "coords": location_info["coords"],
-                "area_type": location_info["type"]
-            })
+        # Get pickup cluster info
+        pickup_cluster_info = models['cluster_centroids'][p_cluster]
         
         return jsonify({
             'status': 'success',
             'pickup_cluster': int(p_cluster),
+            'pickup_cluster_name': pickup_cluster_info['name'],
+            'pickup_cluster_color': pickup_cluster_info['color'],
             'pickup_coords': [p_lat, p_lon],
             'hour': hour,
             'month': month,
-            'day_of_week': ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'][day],
-            'top_predictions': enhanced_predictions,
-            'total_clusters': len(cluster_locations)
+            'day_of_week': ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][day],
+            'top_predictions': top_3_predictions,
+            'total_clusters': 6,
+            'model_info': {
+                'type': 'LightGBM',
+                'clusters_unified': True
+            }
         })
         
     except Exception as e:
+        print(f"Error in predict_destination: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
-def get_confidence_label(probability):
-    if probability >= 0.8:
-        return "Sangat Tinggi"
-    elif probability >= 0.6:
-        return "Tinggi"
-    elif probability >= 0.4:
-        return "Sedang"
-    else:
-        return "Rendah"
-    
 @app.route('/api/search', methods=['GET'])
 def search_location():
+    """Search for locations in NYC area"""
     query = request.args.get('q', '')
     if len(query) < 3:
         return jsonify([])
     
     try:
-        import requests
-        url = f'https://nominatim.openstreetmap.org/search?format=json&q={query}&viewbox=-74.25,40.49,-73.70,40.91&bounded=1'
-        headers = {'User-Agent': 'NYC-Taxi-App'}
-        response = requests.get(url, headers=headers)
+        # Focus search on NYC area
+        url = f'https://nominatim.openstreetmap.org/search?format=json&q={query}&viewbox=-74.25,40.49,-73.70,40.91&bounded=1&limit=10'
+        headers = {'User-Agent': 'NYC-Taxi-App/1.0'}
+        response = requests.get(url, headers=headers, timeout=5)
         data = response.json()
         
         results = []
-        for item in data[:10]:  # Limit to 10 results
+        for item in data[:8]:  # Limit to 8 results
             results.append({
                 'display_name': item['display_name'],
                 'lat': float(item['lat']),
                 'lon': float(item['lon'])
             })
         return jsonify(results)
-    except:
+    except Exception as e:
+        print(f"Search error: {e}")
         return jsonify([])
 
+@app.route('/api/route', methods=['GET'])
+def get_route():
+    """Get route geometry between two points"""
+    try:
+        p_lat = request.args.get('p_lat', type=float)
+        p_lon = request.args.get('p_lon', type=float)
+        d_lat = request.args.get('d_lat', type=float)
+        d_lon = request.args.get('d_lon', type=float)
+        
+        if None in [p_lat, p_lon, d_lat, d_lon]:
+            return jsonify({'status': 'error', 'message': 'Missing coordinates'}), 400
+        
+        url = f'https://router.project-osrm.org/route/v1/driving/{p_lon},{p_lat};{d_lon},{d_lat}?overview=full&geometries=geojson&steps=true'
+        
+        response = requests.get(url, timeout=10)
+        data = response.json()
+        
+        if data.get('code') == 'Ok' and data.get('routes'):
+            route = data['routes'][0]
+            return jsonify({
+                'status': 'success',
+                'geometry': route['geometry'],
+                'distance': route['distance'],
+                'duration': route['duration'],
+                'steps': route.get('legs', [{}])[0].get('steps', [])
+            })
+        
+        return jsonify({'status': 'error', 'message': 'No route found'}), 404
+        
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, port=5000)
