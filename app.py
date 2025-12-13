@@ -348,7 +348,8 @@ def predict_destination():
         # Feature Engineering
         hour = dt.hour
         month = dt.month
-        day = dt.weekday()
+        day = dt.weekday()  # 0=Monday, 1=Tuesday, ...
+        day_of_week = day + 1  # Convert to 1=Monday, 2=Tuesday, ...
         is_weekend = 1 if day >= 5 else 0
         is_rush = 1 if hour in [7, 8, 9, 16, 17, 18, 19] else 0
         
@@ -361,56 +362,83 @@ def predict_destination():
         # K-Means Clustering
         p_cluster = int(models['kmeans'].predict([[p_lat, p_lon]])[0])
         
-        # Prepare input data
+        # PERBAIKAN: Gunakan hanya fitur yang dibutuhkan model
         input_data = {
-            'pickup_longitude': p_lon,
-            'pickup_latitude': p_lat,
+            'pickup_cluster': p_cluster,
+            'passenger_count': passengers,
             'hour': hour,
+            'day_of_week': day_of_week,
             'month': month,
             'is_weekend': is_weekend,
             'is_rush_hour': is_rush,
-            'passenger_count': passengers,
-            'pickup_cluster': p_cluster,
-            'day_of_week_idx': day + 1,
             'hour_sin': h_sin,
             'hour_cos': h_cos,
             'month_sin': m_sin,
             'month_cos': m_cos
         }
         
+        print(f"📊 Input features: {input_data}")
+        
         # Create DataFrame
         df_in = pd.DataFrame([input_data])
         
-        # FIX: Untuk LightGBM Booster, gunakan predict() bukan predict_proba()
-        try:
-            # Prediksi langsung dengan LightGBM
-            prediction = models['lgb_dest'].predict(df_in)[0]
-            
-            # Jika model mengembalikan probability untuk multiple classes
-            if isinstance(prediction, np.ndarray) and len(prediction) > 1:
-                # Model mengembalikan probabilities untuk semua kelas
-                probabilities = prediction
-                print(f"🔍 Got array probabilities: {probabilities}")
-            else:
-                # Model mengembalikan single value atau class prediction
-                # Untuk demo, buat probabilities random
-                print(f"🔍 Got single prediction: {prediction}")
-                np.random.seed(int(p_lat * 1000 + p_lon * 1000 + hour))
-                probabilities = np.random.rand(len(models['cluster_centroids']))
-                probabilities = probabilities / probabilities.sum()  # Normalize
-                
-        except Exception as e:
-            print(f"⚠️  LightGBM prediction error, using fallback: {e}")
-            # Fallback: Generate random probabilities
-            np.random.seed(int(p_lat * 1000 + p_lon * 1000 + hour))
-            probabilities = np.random.rand(len(models['cluster_centroids']))
-            probabilities = probabilities / probabilities.sum()
+        # Ambil fitur yang dibutuhkan model
+        expected_features = models['feat_dest']
+        print(f"📋 Expected features ({len(expected_features)}): {expected_features}")
         
-        print(f"🔍 Final probabilities shape: {probabilities.shape}")
-        print(f"🔍 Probabilities sum: {probabilities.sum()}")
+        # Tambahkan fitur yang hilang
+        missing_features = [f for f in expected_features if f not in df_in.columns]
+        if missing_features:
+            print(f"⚠️  Adding missing features: {missing_features}")
+            for feat in missing_features:
+                if 'day_of_week_idx' in feat:
+                    df_in[feat] = day_of_week
+                elif 'day' in feat:
+                    df_in[feat] = day_of_week
+                elif 'sin' in feat or 'cos' in feat:
+                    df_in[feat] = 0.0
+                else:
+                    df_in[feat] = 0
+        
+        # Pastikan urutan kolom sesuai dengan training
+        df_in = df_in[expected_features]
+        
+        print(f"✅ Final dataframe shape: {df_in.shape}")
+        
+        # --- PREDIKSI ---
+        try:
+            # LightGBM predict
+            probabilities = models['lgb_dest'].predict(df_in)
+            
+            # Jika output 2D, ambil baris pertama
+            if len(probabilities.shape) == 2:
+                probabilities = probabilities[0]
+            
+            # Pastikan probabilities valid
+            if np.sum(probabilities) == 0:
+                print("⚠️  All probabilities zero, using fallback")
+                probabilities = np.ones(len(models['cluster_centroids'])) / len(models['cluster_centroids'])
+            
+        except Exception as e:
+            print(f"⚠️ LightGBM prediction error: {e}")
+            
+            # Fallback: probabilities berdasarkan cluster pickup
+            probabilities = np.zeros(len(models['cluster_centroids']))
+            probabilities[p_cluster] = 0.4  # 40% untuk cluster pickup
+            
+            # Beri probabilitas ke cluster lain
+            for i in range(len(probabilities)):
+                if i != p_cluster:
+                    probabilities[i] = np.random.rand() * 0.1
+            
+            # Normalisasi
+            probabilities = probabilities / probabilities.sum()
         
         # Get top 3 predictions
         top_3_indices = np.argsort(probabilities)[-3:][::-1]
+        
+        print(f"🏆 Top 3 indices: {top_3_indices}")
+        print(f"📊 Top 3 probabilities: {[probabilities[i] for i in top_3_indices]}")
         
         top_3_predictions = []
         for idx in top_3_indices:
@@ -418,7 +446,6 @@ def predict_destination():
                 prob = float(probabilities[idx])
                 cluster_info = models['cluster_centroids'][idx]
                 
-                # FIX: Get description from CLUSTER_NAMES
                 description = CLUSTER_NAMES.get(idx, {}).get('description', 'No description available')
                 
                 top_3_predictions.append({
@@ -442,64 +469,23 @@ def predict_destination():
             'pickup_cluster_color': pickup_cluster_info['color'],
             'pickup_coords': [p_lat, p_lon],
             'hour': hour,
-            'month': month,
             'day_of_week': ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][day],
-            'top_predictions': top_3_predictions,
-            'total_clusters': len(models['cluster_centroids'])
+            'top_predictions': top_3_predictions
         }
         
-        print(f"✅ Destination prediction successful")
-        print(f"   Top prediction: {top_3_predictions[0]['name']} ({top_3_predictions[0]['probability']}%)")
+        print(f"✅ Destination prediction successful!")
+        print(f"   Pickup: Zone {p_cluster} ({pickup_cluster_info['name']})")
         
         return jsonify(response)
         
     except Exception as e:
-        print(f"❌ Error in predict_destination: {e}")
-        traceback.print_exc()
+        print(f"❌ Critical Error in predict_destination: {e}")
         
-        # Return demo data if prediction fails
+        # Fallback response sederhana
         return jsonify({
-            'status': 'success',
-            'pickup_cluster': 7,
-            'pickup_cluster_name': 'Midtown Manhattan (Times Square)',
-            'pickup_cluster_color': '#17BECF',
-            'pickup_coords': [p_lat, p_lon],
-            'hour': hour,
-            'month': month,
-            'day_of_week': ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][day],
-            'top_predictions': [
-                {
-                    'cluster': 0,
-                    'name': 'Lower Manhattan & Financial District',
-                    'type': 'Business Hub',
-                    'color': '#1F77B4',
-                    'probability': 45.2,
-                    'confidence': 'Medium',
-                    'center': [40.7092, -74.0133],
-                    'description': 'Wall Street, World Trade Center, Tribeca.'
-                },
-                {
-                    'cluster': 8,
-                    'name': 'Upper West Side & Harlem',
-                    'type': 'Residential/Academic',
-                    'color': '#2CA02C',
-                    'probability': 32.5,
-                    'confidence': 'Medium',
-                    'center': [40.7870, -73.9754],
-                    'description': 'Columbia University area.'
-                },
-                {
-                    'cluster': 3,
-                    'name': 'Chelsea, Flatiron & Union Square',
-                    'type': 'Lifestyle/Tech',
-                    'color': '#E377C2',
-                    'probability': 22.3,
-                    'confidence': 'Low',
-                    'center': [40.7421, -73.9917],
-                    'description': 'Restaurant and shopping area.'
-                }
-            ]
-        })
+            'status': 'error', 
+            'message': str(e)
+        }), 500
 
 @app.route('/api/search', methods=['GET'])
 def search_location():

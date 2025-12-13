@@ -575,14 +575,6 @@ function displayPredictionResults(data, hour, minute, dayName) {
                             </div>
                         </div>
                         
-                        <div class="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                            <div class="flex items-center">
-                                <i class="fas fa-info-circle text-blue-600 mr-2"></i>
-                                <span class="text-sm text-blue-700">
-                                    Prediction based on NYC historical traffic patterns
-                                </span>
-                            </div>
-                        </div>
                     </div>
 
                     <!-- Divider -->
@@ -591,47 +583,6 @@ function displayPredictionResults(data, hour, minute, dayName) {
                     <!-- Right: Traffic Information -->
                     <div class="flex-1 w-full space-y-6">
                         
-                        <!-- Traffic Status Card -->
-                        <div class="bg-white p-6 rounded-xl border-2 border-${trafficColor}-200 shadow-sm">
-                            <div class="flex items-center mb-4">
-                                <div class="w-12 h-12 rounded-full bg-${trafficColor}-100 flex items-center justify-center mr-4">
-                                    <i class="fas fa-${trafficIcon} text-${trafficColor}-600 text-xl"></i>
-                                </div>
-                                <div>
-                                    <h3 class="text-lg font-bold text-gray-900">${trafficCondition}</h3>
-                                    <p class="text-sm text-${trafficColor}-600 font-medium">${trafficMessage}</p>
-                                </div>
-                            </div>
-                            
-                            <div class="mt-4">
-                                <div class="flex items-center text-sm text-gray-600 mb-2">
-                                    <i class="fas fa-calendar-day mr-2"></i>
-                                    <span>${dayName} at ${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}</span>
-                                </div>
-                                
-                                <!-- Traffic Level Indicator -->
-                                <div class="mt-4">
-                                    <div class="flex justify-between text-sm mb-2">
-                                        <span class="text-gray-600">Traffic Level</span>
-                                        <span class="font-bold text-${trafficColor}-600">
-                                            ${isRushHour ? 'High' : 'Normal'}
-                                        </span>
-                                    </div>
-                                    <div class="flex items-center space-x-1">
-                                        ${Array.from({length: 5}).map((_, i) => {
-                                            const active = isRushHour ? i >= 3 : i <= 2;
-                                            return `<div class="flex-1 h-2 rounded-full ${active ? `bg-${trafficColor}-500` : 'bg-gray-200'}"></div>`;
-                                        }).join('')}
-                                    </div>
-                                    <div class="text-xs text-gray-500 mt-2">
-                                        ${isRushHour ? 
-                                            'Peak hours: Heavy traffic expected' : 
-                                            'Off-peak: Smooth traffic flow'}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
                         <!-- Traffic Details Card -->
                         <div class="bg-gray-50 p-6 rounded-xl border border-gray-200">
                             <div class="flex items-center mb-4">
@@ -668,15 +619,7 @@ function displayPredictionResults(data, hour, minute, dayName) {
                                     </div>
                                 </div>
                             </div>
-                            
-                            <div class="mt-6 pt-4 border-t border-gray-200">
-                                <div class="flex items-center text-sm text-gray-500">
-                                    <i class="fas fa-database mr-2"></i>
-                                    <span>Based on NYC taxi data analysis (8-10 AM & 3-6 PM peak hours)</span>
-                                </div>
-                            </div>
                         </div>
-
                     </div>
                 </div>
             </div>
