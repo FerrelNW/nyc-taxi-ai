@@ -8,6 +8,13 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
     
+   <!-- Dynamic CSS based on route -->
+    {% if request.path == '/destination' %}
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/destination.css') }}">
+    {% elif request.path == '/duration' %}
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/duration.css') }}">
+    {% endif %}
+    
     <style>
         body { font-family: 'Segoe UI', system-ui, sans-serif; }
         .leaflet-container { font-family: inherit; }
@@ -101,6 +108,13 @@
 
     <!-- Common Scripts -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- Dynamic JavaScript based on route -->
+    {% if request.path == '/destination' %}
+        <script src="{{ url_for('static', filename='js/destination.js') }}"></script>
+    {% elif request.path == '/duration' %}
+        <script src="{{ url_for('static', filename='js/duration.js') }}"></script>
+    {% endif %}
     
     {% block extra_js %}{% endblock %}
 </body>

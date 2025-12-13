@@ -34,12 +34,12 @@ function initializeMap() {
         reverseGeocode(lat, lng, 'pickup_input');
     });
 
-    // Initialize with default location
+    // Initialize with default location (TANPA load clusters di awal)
     setTimeout(() => {
         setPickupMarker(40.7489, -73.9680);
         document.getElementById('pickup_input').value = 'Times Square, New York';
         reverseGeocode(40.7489, -73.9680, 'pickup_input');
-        loadClusters();
+        // HAPUS: loadClusters(); // Cluster tidak dimuat saat awal
     }, 1000);
 }
 
@@ -72,34 +72,33 @@ function setPickupMarker(lat, lng) {
     getZoneInfo(lat, lng);
 }
 
-// Load clusters from API with larger coverage
-function loadClusters() {
-    fetch('/api/clusters')
-        .then(res => res.json())
-        .then(data => {
-            if (data.status === 'success') {
-                displayClusters(data.clusters);
-                createLegend(data.clusters);
-            }
-        });
-}
-
-// Function to create Voronoi-like polygons covering entire NYC
-function createVoronoiPolygons(clusters) {
+// Fungsi untuk memuat cluster HANYA setelah prediksi
+function loadClustersAfterPrediction(clusters) {
     // Clear existing layers
     clusterLayers.forEach(layer => map.removeLayer(layer));
     clusterLayers = [];
     clusterPolygons = [];
     
-    // Create polygons for each cluster
+    // Create polygons for predicted clusters only
+    createPredictedClustersPolygons(clusters);
+    
+    // Create legend hanya untuk cluster yang diprediksi
+    createPredictionLegend(clusters);
+    
+    // Show legend container
+    document.getElementById('legend_container').classList.remove('hidden');
+}
+
+// Hanya buat polygon untuk cluster yang diprediksi
+function createPredictedClustersPolygons(clusters) {
     clusters.forEach((cluster, index) => {
-        // Create a large circle (3km radius) around cluster center
+        // Create circle for predicted cluster (radius lebih kecil)
         const circle = L.circle(cluster.center, {
-            radius: 3000, // 3km for full coverage
+            radius: 1500, // 1.5km radius untuk predicted clusters
             color: cluster.color,
             fillColor: cluster.color,
-            fillOpacity: 0.2,
-            weight: 2.5,
+            fillOpacity: 0.15,
+            weight: 2,
             className: 'cluster-polygon'
         }).addTo(map);
         
@@ -111,10 +110,10 @@ function createVoronoiPolygons(clusters) {
                     <div class="bg-white/90 backdrop-blur-sm px-3 py-2 rounded-lg shadow-lg border flex items-center" 
                          style="color: ${cluster.color}; border-color: ${cluster.color}">
                         <div class="w-3 h-3 rounded-full mr-2" style="background-color: ${cluster.color}"></div>
-                        <span class="font-bold">Zone ${cluster.id}</span>
+                        <span class="font-bold">#${index + 1}: ${Math.round(cluster.probability)}%</span>
                     </div>
                 `,
-                iconSize: [80, 40]
+                iconSize: [100, 40]
             })
         }).addTo(map);
         
@@ -132,16 +131,16 @@ function createVoronoiPolygons(clusters) {
         // Add hover effects
         circle.on('mouseover', () => {
             circle.setStyle({
-                fillOpacity: 0.35,
-                weight: 3.5
+                fillOpacity: 0.25,
+                weight: 3
             });
         });
         
         circle.on('mouseout', () => {
-            if (selectedZone !== cluster.id) {
+            if (selectedZone !== cluster.cluster) {
                 circle.setStyle({
-                    fillOpacity: 0.2,
-                    weight: 2.5
+                    fillOpacity: 0.15,
+                    weight: 2
                 });
             }
         });
@@ -150,27 +149,30 @@ function createVoronoiPolygons(clusters) {
         clusterLayers.push(circle);
         clusterLayers.push(label);
     });
-    
-    // Show legend
-    document.getElementById('legend_container').classList.remove('hidden');
 }
 
-function displayClusters(clusters) {
-    createVoronoiPolygons(clusters);
-}
-
-function createLegend(clusters) {
+// Legend hanya untuk cluster yang diprediksi
+function createPredictionLegend(clusters) {
     const container = document.getElementById('zone_legend');
-    container.innerHTML = '';
+    container.innerHTML = '<h5 class="text-xs font-semibold text-gray-500 mb-2">Predicted Destination Zones</h5>';
     
-    clusters.forEach(cluster => {
+    // Urutkan berdasarkan probability
+    const sortedClusters = [...clusters].sort((a, b) => b.probability - a.probability);
+    
+    sortedClusters.forEach((cluster, index) => {
         const item = document.createElement('div');
-        item.className = 'legend-item';
-        item.dataset.zoneId = cluster.id;
+        item.className = 'legend-item mb-2';
+        item.dataset.zoneId = cluster.cluster;
         
         item.innerHTML = `
             <div class="legend-color" style="background-color: ${cluster.color}"></div>
-            <span>Zone ${cluster.id}</span>
+            <div class="flex-1">
+                <div class="flex justify-between items-center">
+                    <span class="text-xs font-medium">#${index + 1}: Zone ${cluster.cluster}</span>
+                    <span class="text-xs font-bold" style="color: ${cluster.color}">${cluster.probability}%</span>
+                </div>
+                <div class="text-xs text-gray-500 truncate" style="max-width: 140px">${cluster.name.split('&')[0]}</div>
+            </div>
         `;
         
         item.addEventListener('click', () => {
@@ -300,41 +302,41 @@ function displayZoneInfo(cluster) {
 
 function showZoneDetails(cluster) {
     // Highlight selected zone
-    if (selectedZone !== null && selectedZone !== cluster.id) {
+    if (selectedZone !== null && selectedZone !== cluster.cluster) {
         clusterPolygons.forEach(poly => {
             poly.setStyle({
-                fillOpacity: 0.2,
-                weight: 2.5
+                fillOpacity: 0.15,
+                weight: 2
             });
         });
     }
     
     // Highlight the selected zone
     const selectedPoly = clusterPolygons.find(poly => 
-        poly.getLatLng().lat === cluster.center[0] &&
-        poly.getLatLng().lng === cluster.center[1]
+        Math.abs(poly.getLatLng().lat - cluster.center[0]) < 0.001 &&
+        Math.abs(poly.getLatLng().lng - cluster.center[1]) < 0.001
     );
     
     if (selectedPoly) {
         selectedPoly.setStyle({
-            fillOpacity: 0.4,
-            weight: 4,
+            fillOpacity: 0.3,
+            weight: 3,
             color: cluster.color
         });
         selectedPoly.bringToFront();
     }
     
-    selectedZone = cluster.id;
+    selectedZone = cluster.cluster;
     
     // Update details panel
-    document.getElementById('zone_title').textContent = `Zone ${cluster.id} Details`;
+    document.getElementById('zone_title').textContent = `Zone ${cluster.cluster} Details`;
     document.getElementById('detail_color').style.backgroundColor = cluster.color;
     document.getElementById('detail_name').textContent = cluster.name;
     document.getElementById('detail_type').textContent = cluster.type;
     document.getElementById('detail_description').textContent = cluster.description;
     document.getElementById('detail_coords').textContent = 
         `${cluster.center[0].toFixed(4)}, ${cluster.center[1].toFixed(4)}`;
-    document.getElementById('detail_id').textContent = cluster.id;
+    document.getElementById('detail_id').textContent = cluster.cluster;
     
     // Show details panel
     document.getElementById('zone_details').classList.remove('hidden');
@@ -350,15 +352,15 @@ function hideZoneDetails() {
     if (selectedZone !== null) {
         clusterPolygons.forEach(poly => {
             poly.setStyle({
-                fillOpacity: 0.2,
-                weight: 2.5
+                fillOpacity: 0.15,
+                weight: 2
             });
         });
         selectedZone = null;
     }
 }
 
-// PREDICTION FUNCTION - FIXED VERSION
+// PREDICTION FUNCTION - DIPERBAIKI
 function predictDestination() {
     const pLat = document.getElementById('pickup_lat').value;
     
@@ -385,10 +387,14 @@ function predictDestination() {
     document.getElementById('loading').classList.remove('hidden');
     document.getElementById('result_section').classList.add('hidden');
     document.getElementById('pattern_analysis').classList.add('hidden');
+    document.getElementById('legend_container').classList.add('hidden'); // Sembunyikan legend
 
-    // Clear previous predictions
+    // Clear previous predictions and clusters
     predictionMarkers.forEach(marker => map.removeLayer(marker));
     predictionMarkers = [];
+    clusterLayers.forEach(layer => map.removeLayer(layer));
+    clusterLayers = [];
+    clusterPolygons = [];
 
     const payload = {
         pickup_lat: pLat,
@@ -413,7 +419,7 @@ function predictDestination() {
         if (data.status === 'success') {
             // Update model info
             document.getElementById('model_info').textContent = 
-                `LightGBM · ${data.total_clusters} Zones`;
+                `LightGBM · Top ${Math.min(3, data.top_predictions.length)} Predictions`;
             
             // Display top 3 predictions
             displayTopPredictions(data.top_predictions);
@@ -426,8 +432,15 @@ function predictDestination() {
                 addPredictionMarker(pred, index);
             });
             
+            // Load and display ONLY predicted clusters (setelah prediksi)
+            loadClustersAfterPrediction(data.top_predictions);
+            
             // Show pattern analysis
             displayPatternAnalysis(data, hour);
+            
+            // Fit map to show pickup and all predictions
+            fitMapToPredictions(data.top_predictions);
+            
         } else {
             alert('Error: ' + data.message);
         }
@@ -438,6 +451,29 @@ function predictDestination() {
         document.getElementById('loading').classList.add('hidden');
         alert('Connection failed. Please try again.');
         console.error(err);
+    });
+}
+
+// Fungsi untuk fit map ke predictions
+function fitMapToPredictions(predictions) {
+    if (predictions.length === 0) return;
+    
+    const bounds = L.latLngBounds();
+    
+    // Add pickup marker
+    if (pickupMarker) {
+        bounds.extend(pickupMarker.getLatLng());
+    }
+    
+    // Add prediction centers
+    predictions.forEach(pred => {
+        bounds.extend(pred.center);
+    });
+    
+    // Fit bounds dengan padding
+    map.fitBounds(bounds, { 
+        padding: [50, 50],
+        maxZoom: 13
     });
 }
 
@@ -500,13 +536,24 @@ function displayTopPredictions(predictions) {
 }
 
 function showZoneDetailsById(zoneId) {
+    // Get cluster data from API
     fetch('/api/clusters')
         .then(res => res.json())
         .then(data => {
             if (data.status === 'success') {
                 const cluster = data.clusters.find(c => c.id === zoneId);
                 if (cluster) {
-                    showZoneDetails(cluster);
+                    // Convert to format yang diharapkan showZoneDetails
+                    const clusterDetails = {
+                        cluster: cluster.id,
+                        name: cluster.name,
+                        type: cluster.type,
+                        color: cluster.color,
+                        description: cluster.description,
+                        center: cluster.center,
+                        probability: 0 // Default value
+                    };
+                    showZoneDetails(clusterDetails);
                 }
             }
         });
@@ -545,18 +592,6 @@ function addPredictionMarker(prediction, rank) {
     `);
     
     predictionMarkers.push(marker);
-    
-    // Center map on all prediction markers
-    if (predictionMarkers.length === 3) {
-        const bounds = L.latLngBounds();
-        predictionMarkers.forEach(marker => {
-            bounds.extend(marker.getLatLng());
-        });
-        if (pickupMarker) {
-            bounds.extend(pickupMarker.getLatLng());
-        }
-        map.fitBounds(bounds, { padding: [100, 100] });
-    }
 }
 
 function displayPatternAnalysis(data, hour) {
@@ -597,24 +632,191 @@ function clearMap() {
     document.getElementById('result_section').classList.add('hidden');
     document.getElementById('pattern_analysis').classList.add('hidden');
     document.getElementById('zone_details').classList.add('hidden');
+    document.getElementById('legend_container').classList.add('hidden'); // Sembunyikan legend
     
-    // Clear prediction markers
+    // Clear all layers
     predictionMarkers.forEach(marker => map.removeLayer(marker));
     predictionMarkers = [];
+    clusterLayers.forEach(layer => map.removeLayer(layer));
+    clusterLayers = [];
+    clusterPolygons = [];
     
     // Reset zone styles
     if (selectedZone !== null) {
-        clusterPolygons.forEach(poly => {
-            poly.setStyle({
-                fillOpacity: 0.2,
-                weight: 2.5
-            });
-        });
         selectedZone = null;
     }
     
     // Reset map view
     map.setView([40.7580, -73.9855], 11);
+}
+
+// FUNGSI BARU: Display current zone info
+function updateCurrentZoneInfo(cluster) {
+    const currentZoneInfo = document.getElementById('current_zone_info');
+    const predictedZonesSection = document.getElementById('predicted_zones_section');
+    
+    currentZoneInfo.classList.remove('hidden');
+    predictedZonesSection.classList.add('hidden');
+    
+    document.getElementById('zone_color').style.backgroundColor = cluster.color;
+    document.getElementById('zone_name').textContent = cluster.name;
+    document.getElementById('zone_type').textContent = cluster.type;
+}
+
+// FUNGSI BARU: Display prediction results dengan layout baru
+function displayPredictionResults(data) {
+    const predictedZonesSection = document.getElementById('predicted_zones_section');
+    const currentZoneInfo = document.getElementById('current_zone_info');
+    
+    // Hide current zone simple info, show detailed layout
+    currentZoneInfo.classList.add('hidden');
+    predictedZonesSection.classList.remove('hidden');
+    
+    // Update Current Zone Details
+    document.getElementById('current_zone_color').style.backgroundColor = data.pickup_cluster_color;
+    document.getElementById('current_zone_name').textContent = data.pickup_cluster_name;
+    document.getElementById('current_zone_type').textContent = CLUSTER_NAMES[data.pickup_cluster]?.type || 'Unknown';
+    document.getElementById('current_zone_coords').textContent = 
+        `${data.pickup_coords[0].toFixed(4)}, ${data.pickup_coords[1].toFixed(4)}`;
+    document.getElementById('current_zone_description').textContent = 
+        CLUSTER_NAMES[data.pickup_cluster]?.description || 'No description available';
+    
+    // Display Top Predictions
+    const container = document.getElementById('top_predictions_grid');
+    container.innerHTML = '';
+    
+    const rankColors = ['#EF4444', '#3B82F6', '#F59E0B'];
+    const rankIcons = ['fa-crown', 'fa-medal', 'fa-award'];
+    const rankTitles = ['1st', '2nd', '3rd'];
+    
+    data.top_predictions.forEach((pred, index) => {
+        const card = document.createElement('div');
+        card.className = 'prediction-card';
+        card.style.borderTop = `4px solid ${rankColors[index]}`;
+        
+        card.innerHTML = `
+            <div class="p-5">
+                <div class="flex items-start justify-between mb-4">
+                    <div class="flex items-center">
+                        <div class="rank-badge mr-4" style="background-color: ${rankColors[index]}">
+                            <i class="fas ${rankIcons[index]} text-white"></i>
+                        </div>
+                        <div>
+                            <div class="text-xs font-semibold text-gray-500 mb-1">${rankTitles[index]} Prediction</div>
+                            <h4 class="font-bold text-gray-900 text-lg">${pred.name}</h4>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-2xl font-bold" style="color: ${rankColors[index]}">
+                            ${pred.probability}%
+                        </div>
+                        <div class="text-xs text-gray-500">${pred.confidence} Confidence</div>
+                    </div>
+                </div>
+                
+                <div class="probability-bar mb-3">
+                    <div class="probability-fill" style="width: ${pred.probability}%; background-color: ${rankColors[index]};"></div>
+                </div>
+                
+                <div class="text-sm text-gray-600 mb-4 line-clamp-3">
+                    ${pred.description}
+                </div>
+                
+                <div class="flex items-center justify-between text-sm">
+                    <div class="flex items-center">
+                        <div class="w-3 h-3 rounded-full mr-2" style="background-color: ${pred.color}"></div>
+                        <span class="px-3 py-1 rounded-full bg-gray-100 text-gray-700">Zone ${pred.cluster}</span>
+                    </div>
+                    <button onclick="showZoneDetails(${index})" class="text-purple-600 hover:text-purple-700 font-medium">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        Details
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        container.appendChild(card);
+    });
+    
+    // Show pattern analysis
+    displayPatternAnalysis(data, data.hour);
+    
+    // Smooth scroll to results
+    predictedZonesSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// Update fungsi predictDestination() di destination.js
+function predictDestination() {
+    const pLat = document.getElementById('pickup_lat').value;
+    
+    if (!pLat) {
+        alert('Please select a pickup location first!');
+        return;
+    }
+
+    const hour = parseInt(document.getElementById('hour').value);
+    const day = parseInt(document.getElementById('day').value);
+    const passengers = parseInt(document.getElementById('passengers').value);
+    
+    // Create datetime string - FIXED
+    const now = new Date();
+    const datetime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, 0);
+    const datetimeStr = datetime.toISOString().slice(0, 16);
+
+    // Show loading
+    const predictBtn = document.getElementById('predictBtn');
+    const originalText = predictBtn.innerHTML;
+    predictBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Predicting...';
+    predictBtn.disabled = true;
+    
+    document.getElementById('loading').classList.remove('hidden');
+
+    const payload = {
+        pickup_lat: pLat,
+        pickup_lon: document.getElementById('pickup_lon').value,
+        datetime: datetimeStr,
+        passengers: passengers
+    };
+
+    console.log('📤 Sending destination prediction:', payload);
+
+    fetch('/api/predict_destination', {
+        method: 'POST',
+        headers: { 
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        },
+        body: JSON.stringify(payload)
+    })
+    .then(res => {
+        console.log('📥 Response status:', res.status);
+        if (!res.ok) {
+            throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        return res.json();
+    })
+    .then(data => {
+        console.log('✅ Destination prediction response:', data);
+        
+        // Reset button
+        predictBtn.innerHTML = originalText;
+        predictBtn.disabled = false;
+        
+        document.getElementById('loading').classList.add('hidden');
+        
+        if (data.status === 'success') {
+            displayPredictionResults(data);
+        } else {
+            alert('Error: ' + (data.message || 'Unknown error'));
+        }
+    })
+    .catch(err => {
+        console.error('❌ Fetch error:', err);
+        predictBtn.innerHTML = originalText;
+        predictBtn.disabled = false;
+        document.getElementById('loading').classList.add('hidden');
+        alert('Connection failed. Please try again. Error: ' + err.message);
+    });
 }
 
 // Initialize when DOM is loaded
