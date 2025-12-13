@@ -1,154 +1,303 @@
 {% extends "layout.html" %}
 
-{% block title %}Duration Estimation - NYC Taxi AI{% endblock %}
+{% block title %}Duration Prediction - NYC Taxi AI{% endblock %}
 
 {% block content %}
-<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- Page Header -->
     <div class="mb-8">
         <h1 class="text-3xl font-bold text-gray-900 mb-2">NYC Taxi Trip Duration Prediction</h1>
-        <p class="text-gray-600">Predict travel time between locations in New York City</p>
+        <p class="text-gray-600">Predict travel time based on pickup & dropoff locations, time, and traffic patterns</p>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <!-- Layout Grid: Kiri Input, Kanan Map -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+        <!-- Input Section (Kiri) -->
         <div class="lg:col-span-1">
             <div class="card-enhanced h-full">
                 <h2 class="text-xl font-bold text-gray-900 mb-6">Trip Details</h2>
 
-                <div class="mb-6">
+                <!-- Time Selection - DIPERBAIKI -->
+                <div class="input-group">
                     <label class="input-label">
-                        <i class="far fa-clock text-blue-500"></i>
-                        Departure Time
+                        <i class="far fa-clock text-purple-600"></i>
+                        Time & Day
                     </label>
-                    <div class="time-input">
-                        <select id="hour" class="input-enhanced text-center">
-                            {% for h in range(24) %}
-                            <option value="{{ h }}" {% if h==now.hour %}selected{% endif %}>{{ "%02d"|format(h) }}</option>
-                            {% endfor %}
-                        </select>
-                        <span class="text-gray-400 font-bold">:</span>
-                        <select id="minute" class="input-enhanced text-center">
-                            <option value="00">00</option>
-                            <option value="15">15</option>
-                            <option value="30">30</option>
-                            <option value="45">45</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="mb-6">
-                    <label class="input-label">
-                        <i class="far fa-calendar-alt text-blue-500"></i>
-                        Day of Week
-                    </label>
-                    <div class="relative">
-                        <select id="day" class="input-enhanced w-full appearance-none">
-                            <option value="0" {% if now.weekday()==0 %}selected{% endif %}>Monday</option>
-                            <option value="1" {% if now.weekday()==1 %}selected{% endif %}>Tuesday</option>
-                            <option value="2" {% if now.weekday()==2 %}selected{% endif %}>Wednesday</option>
-                            <option value="3" {% if now.weekday()==3 %}selected{% endif %}>Thursday</option>
-                            <option value="4" {% if now.weekday()==4 %}selected{% endif %}>Friday</option>
-                            <option value="5" {% if now.weekday()==5 %}selected{% endif %}>Saturday</option>
-                            <option value="6" {% if now.weekday()==6 %}selected{% endif %}>Sunday</option>
-                        </select>
-                        <div class="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-gray-500">
-                            <i class="fas fa-chevron-down text-xs"></i>
+                    <div class="time-input-grid">
+                        <div class="time-group">
+                            <label>Hour</label>
+                            <select id="hour" class="select-enhanced">
+                                {% for h in range(24) %}
+                                <option value="{{ h }}" {% if h==now.hour %}selected{% endif %}>
+                                    {{ "%02d"|format(h) }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="time-group">
+                            <label>Minute</label>
+                            <select id="minute" class="select-enhanced">
+                                {% for m in range(0, 60, 5) %}
+                                <option value="{{ m }}" {% if m==now.minute %}selected{% endif %}>
+                                    {{ "%02d"|format(m) }}
+                                </option>
+                                {% endfor %}
+                            </select>
                         </div>
                     </div>
+                    <div class="flex items-center text-sm text-gray-500 mt-1">
+                        <i class="fas fa-clock mr-2"></i>
+                        Format: <span class="font-bold ml-1">HH : MM</span>
+                    </div>
+                    <div class="mt-2">
+                        <label>Day</label>
+                        <select id="day" class="select-enhanced w-full mt-1">
+                            <option value="0">Monday</option>
+                            <option value="1">Tuesday</option>
+                            <option value="2">Wednesday</option>
+                            <option value="3">Thursday</option>
+                            <option value="4">Friday</option>
+                            <option value="5">Saturday</option>
+                            <option value="6">Sunday</option>
+                        </select>
+                    </div>
+                    <div class="input-hint mt-2">
+                        <i class="fas fa-info-circle mr-2"></i>
+                        Select trip start time and day
+                    </div>
                 </div>
 
-                <div class="mb-8">
+                <!-- Passengers -->
+                <div class="input-group">
                     <label class="input-label">
-                        <i class="fas fa-user-friends text-blue-500"></i>
+                        <i class="fas fa-users text-purple-600"></i>
                         Passengers
                     </label>
-                    <div class="passenger-control">
-                        <button type="button" class="passenger-btn" onclick="document.getElementById('passengers').stepDown()">
-                            <i class="fas fa-minus"></i>
-                        </button>
-                        <input type="number" id="passengers" value="1" min="1" max="6" class="passenger-input" readonly>
-                        <button type="button" class="passenger-btn" onclick="document.getElementById('passengers').stepUp()">
-                            <i class="fas fa-plus"></i>
-                        </button>
+                    <div class="relative passenger-input">
+                        <input type="number" id="passengers" min="1" max="6" value="1"
+                               class="input-enhanced w-full" readonly>
+                        <div class="passenger-controls">
+                            <button type="button" class="passenger-btn" onclick="adjustPassengers(-1)" id="decreaseBtn">
+                                <i class="fas fa-minus"></i>
+                            </button>
+                            <button type="button" class="passenger-btn" onclick="adjustPassengers(1)" id="increaseBtn">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="input-hint">
+                        <i class="fas fa-user-friends mr-2"></i>
+                        1-6 passengers per trip
                     </div>
                 </div>
 
-                <div class="space-y-4 mb-8">
+                <!-- Pickup Location -->
+                <div class="input-group">
+                    <label class="input-label">
+                        <i class="fas fa-map-marker-alt text-green-600"></i>
+                        Pickup Location
+                    </label>
                     <div class="search-container">
-                        <label class="text-xs font-bold text-gray-500 uppercase mb-1 block">Pickup Location</label>
                         <div class="relative">
-                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                <i class="fas fa-map-marker-alt text-green-500"></i>
-                            </div>
-                            <input type="text" id="pickup_input" class="input-enhanced pl-10 w-full" placeholder="Search or click map..." autocomplete="off">
-                            <input type="hidden" id="pickup_lat">
-                            <input type="hidden" id="pickup_lon">
+                            <input type="text" id="pickup_input" 
+                                   class="input-enhanced with-icon w-full"
+                                   placeholder="Search pickup address...">
+                            <i class="fas fa-search input-icon"></i>
                         </div>
                         <div id="pickup_results" class="search-results"></div>
-                        <div id="pickup_status" class="text-xs mt-1 text-gray-400 pl-1 truncate">Click on map or search above</div>
                     </div>
+                    <div class="input-hint">
+                        <i class="fas fa-mouse-pointer text-blue-500 mr-2"></i>
+                        Type to search or click on map
+                    </div>
+                    <div class="mt-2 p-2 bg-green-50 rounded-lg border border-green-100">
+                        <div class="flex items-center text-sm text-green-800" id="pickup_status">
+                            <i class="fas fa-map-marker-alt mr-2"></i>
+                            <span>No pickup location selected</span>
+                        </div>
+                    </div>
+                    <input type="hidden" id="pickup_lat">
+                    <input type="hidden" id="pickup_lon">
+                </div>
 
+                <!-- Dropoff Location -->
+                <div class="input-group">
+                    <label class="input-label">
+                        <i class="fas fa-flag-checkered text-red-600"></i>
+                        Dropoff Location
+                    </label>
                     <div class="search-container">
-                        <label class="text-xs font-bold text-gray-500 uppercase mb-1 block">Dropoff Location</label>
                         <div class="relative">
-                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                <i class="fas fa-map-marker-alt text-red-500"></i>
-                            </div>
-                            <input type="text" id="dropoff_input" class="input-enhanced pl-10 w-full" placeholder="Search or click map..." autocomplete="off">
-                            <input type="hidden" id="dropoff_lat">
-                            <input type="hidden" id="dropoff_lon">
+                            <input type="text" id="dropoff_input" 
+                                   class="input-enhanced with-icon w-full"
+                                   placeholder="Search dropoff address...">
+                            <i class="fas fa-search input-icon"></i>
                         </div>
                         <div id="dropoff_results" class="search-results"></div>
-                        <div id="dropoff_status" class="text-xs mt-1 text-gray-400 pl-1 truncate">Click on map or search above</div>
+                    </div>
+                    <div class="input-hint">
+                        <i class="fas fa-mouse-pointer text-blue-500 mr-2"></i>
+                        Type to search or click on map
+                    </div>
+                    <div class="mt-2 p-2 bg-red-50 rounded-lg border border-red-100">
+                        <div class="flex items-center text-sm text-red-800" id="dropoff_status">
+                            <i class="fas fa-flag-checkered mr-2"></i>
+                            <span>No dropoff location selected</span>
+                        </div>
+                    </div>
+                    <input type="hidden" id="dropoff_lat">
+                    <input type="hidden" id="dropoff_lon">
+                </div>
+
+                <!-- Predict Button -->
+                <div class="mt-8 pt-6 border-t border-gray-100">
+                    <button onclick="predictDuration()" id="predictBtn"
+                            class="btn-primary w-full py-4 text-lg">
+                        <i class="fas fa-chart-line mr-3"></i>
+                        Predict Duration
+                    </button>
+                    <div class="input-hint text-center mt-3">
+                        <i class="fas fa-bolt mr-2"></i>
+                        AI-powered travel time estimation
                     </div>
                 </div>
 
-                <button onclick="predictDuration()" id="predictBtn" class="btn-primary w-full group relative overflow-hidden">
-                    <span class="relative z-10 flex items-center justify-center">
-                        <i class="fas fa-calculator mr-2 group-hover:animate-pulse"></i>
-                        Calculate Duration
-                    </span>
-                    <div class="absolute inset-0 bg-white/20 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
-                </button>
+                <!-- Loading -->
+                <div id="loading" class="hidden mt-6">
+                    <div class="flex flex-col items-center justify-center p-6 bg-blue-50 rounded-2xl">
+                        <div class="relative mb-4">
+                            <div class="w-12 h-12 border-4 border-blue-100 rounded-full"></div>
+                            <div class="absolute top-0 left-0 w-12 h-12 border-4 border-blue-600 rounded-full border-t-transparent animate-spin"></div>
+                        </div>
+                        <p class="text-gray-800 font-semibold">Calculating Route...</p>
+                        <p class="text-sm text-gray-600 mt-1">Analyzing traffic and distance</p>
+                    </div>
+                </div>
             </div>
         </div>
 
+        <!-- Map Section (Kanan) -->
         <div class="lg:col-span-2">
-            <div class="bg-white p-2 rounded-2xl shadow-lg border border-gray-100 h-full relative">
-                <div class="map-controls">
-                    <button onclick="clearMap()" class="control-btn">
-                        <i class="fas fa-trash-alt text-red-500"></i>
-                        Clear All
-                    </button>
-                    <button onclick="swapLocations()" class="control-btn">
-                        <i class="fas fa-exchange-alt text-blue-500"></i>
-                        Swap
-                    </button>
+            <!-- Container untuk Map saja -->
+            <div class="card-enhanced mb-6">
+                <div class="flex justify-between items-center mb-4">
+                    <div>
+                        <h3 class="font-bold text-gray-900 text-lg">NYC Route Map</h3>
+                        <p class="text-sm text-gray-600">Select pickup and dropoff points on the map</p>
+                    </div>
+                    <!-- Tombol Swap dan Clear dipindah ke sini -->
+                    <div class="flex gap-2">
+                        <button onclick="swapLocations()" 
+                                class="control-btn bg-white hover:bg-blue-50 border-blue-200">
+                            <i class="fas fa-exchange-alt text-blue-600"></i>
+                            Swap
+                        </button>
+                        <button onclick="clearMap()" 
+                                class="control-btn bg-white hover:bg-red-50 border-red-200">
+                            <i class="fas fa-trash-alt text-red-600"></i>
+                            Clear
+                        </button>
+                    </div>
                 </div>
                 
                 <div id="map" class="h-[500px] rounded-xl"></div>
                 
-                <div class="map-legend">
-                    <div class="legend-item">
-                        <div class="legend-dot bg-green-500"></div>
-                        <span id="pickup_zone_badge">Pickup</span>
+                <div class="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="flex items-center p-3 bg-green-50 rounded-lg">
+                        <div class="w-4 h-4 rounded-full bg-green-500 mr-3 shadow"></div>
+                        <span class="text-sm font-medium text-gray-700">Pickup Point</span>
                     </div>
-                    <div class="legend-item">
-                        <div class="legend-dot bg-red-500"></div>
-                        <span id="dropoff_zone_badge">Dropoff</span>
+                    <div class="flex items-center p-3 bg-red-50 rounded-lg">
+                        <div class="w-4 h-4 rounded-full bg-red-500 mr-3 shadow"></div>
+                        <span class="text-sm font-medium text-gray-700">Dropoff Point</span>
                     </div>
-                    <div class="legend-item">
-                        <div class="w-8 h-1 bg-blue-500 rounded-full mr-2 opacity-60"></div>
-                        <span>Route</span>
+                    <div class="flex items-center p-3 bg-blue-50 rounded-lg">
+                        <div class="w-4 h-4 rounded-full bg-blue-500 mr-3 shadow"></div>
+                        <span class="text-sm font-medium text-gray-700">Route Line</span>
+                    </div>
+                    <div class="flex items-center p-3 bg-purple-50 rounded-lg">
+                        <div class="w-4 h-4 rounded-full bg-purple-500 mr-3 shadow"></div>
+                        <span class="text-sm font-medium text-gray-700">Traffic Zone</span>
                     </div>
                 </div>
             </div>
-            
+
+            <!-- Output Section (Di bawah Map) -->
+            <div id="predictionResults" class="hidden">
+                <!-- Results will be inserted here by JavaScript -->
+            </div>
         </div>
     </div>
-
-    <div id="predictionResults" class="hidden mt-8">
-        </div>
 </div>
 
-<script src="{{ url_for('static', filename='js/duration.js') }}"></script>
+<!-- JavaScript for improved functionality -->
+<script>
+// Passenger control functions
+function adjustPassengers(change) {
+    const input = document.getElementById('passengers');
+    const decreaseBtn = document.getElementById('decreaseBtn');
+    const increaseBtn = document.getElementById('increaseBtn');
+    
+    let current = parseInt(input.value);
+    current += change;
+    
+    // Validate range
+    if (current < 1) current = 1;
+    if (current > 6) current = 6;
+    
+    input.value = current;
+    
+    // Update button states
+    decreaseBtn.disabled = current <= 1;
+    increaseBtn.disabled = current >= 6;
+}
+
+// Initialize passenger buttons and day selection
+document.addEventListener('DOMContentLoaded', function() {
+    adjustPassengers(0); // Set initial button states
+    
+    // Initialize day selection to current day
+    const today = new Date().getDay();
+    const daySelect = document.getElementById('day');
+    daySelect.value = (today + 6) % 7; // Adjust for your day mapping
+    
+    // Initialize the map
+    if (typeof initializeMap === 'function') {
+        initializeMap();
+    }
+});
+
+// Notification function
+function showNotification(message, type = 'info') {
+    const colors = {
+        success: 'bg-green-100 border-green-400 text-green-700',
+        error: 'bg-red-100 border-red-400 text-red-700',
+        info: 'bg-blue-100 border-blue-400 text-blue-700'
+    };
+    
+    // Remove existing notification
+    const existing = document.getElementById('notification');
+    if (existing) existing.remove();
+    
+    // Create new notification
+    const notification = document.createElement('div');
+    notification.id = 'notification';
+    notification.className = `fixed top-4 right-4 z-50 px-4 py-3 rounded-lg border ${colors[type]} animate-fade-in`;
+    notification.innerHTML = `
+        <div class="flex items-center">
+            <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'} mr-2"></i>
+            <span>${message}</span>
+        </div>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Auto remove after 3 seconds
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.remove();
+        }
+    }, 3000);
+}
+</script>
 {% endblock %}

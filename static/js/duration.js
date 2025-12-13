@@ -5,19 +5,40 @@ let clickMode = 'pickup';
 let currentSearch = null, searchTimeout = null;
 
 function initializeMap() {
+    // Check if map container exists
+    const mapContainer = document.getElementById('map');
+    if (!mapContainer) {
+        console.error('Map container not found!');
+        return;
+    }
+    
     map = L.map('map').setView([40.7580, -73.9855], 12);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-        attribution: '© OpenStreetMap'
+    
+    // Add OpenStreetMap tiles
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 19
     }).addTo(map);
 
     // Set current time values on load
     const now = new Date();
-    document.getElementById('hour').value = now.getHours();
+    const hourSelect = document.getElementById('hour');
+    const minuteSelect = document.getElementById('minute');
+    const daySelect = document.getElementById('day');
     
-    // Convert JS Day (0=Sun, 1=Mon) to our Select (0=Mon, 6=Sun)
-    let currentDayIdx = now.getDay() - 1;
-    if (currentDayIdx === -1) currentDayIdx = 6;
-    document.getElementById('day').value = currentDayIdx;
+    if (hourSelect) hourSelect.value = now.getHours();
+    if (minuteSelect) {
+        // Round minute to nearest 5
+        const minute = Math.floor(now.getMinutes() / 5) * 5;
+        minuteSelect.value = minute;
+    }
+    
+    if (daySelect) {
+        // Convert JS Day (0=Sun, 1=Mon) to our Select (0=Mon, 6=Sun)
+        let currentDayIdx = now.getDay() - 1;
+        if (currentDayIdx === -1) currentDayIdx = 6;
+        daySelect.value = currentDayIdx;
+    }
 
     // Map click handler
     map.on('click', function(e) {
@@ -42,22 +63,41 @@ function initializeMap() {
             reverseGeocode(lat, lng, 'pickup_input');
             clickMode = 'dropoff';
             document.getElementById('pickup_input').classList.add('border-green-500', 'ring-2', 'ring-green-200');
-            document.getElementById('dropoff_input').classList.remove('border-red-500', 'ring-2', 'ring-red-200');
         } else {
             setDropoffMarker(lat, lng);
             reverseGeocode(lat, lng, 'dropoff_input');
             clickMode = 'pickup';
             document.getElementById('dropoff_input').classList.add('border-red-500', 'ring-2', 'ring-red-200');
-            document.getElementById('pickup_input').classList.remove('border-green-500', 'ring-2', 'ring-green-200');
         }
+        
+        drawRouteIfComplete();
     });
 
-    // Initialize with default locations (Example)
-    setTimeout(() => {
-        // Optional: Pre-set markers for demo
-        // setPickupMarker(40.7489, -73.9680); 
-        // setDropoffMarker(40.7128, -74.0060);
-    }, 1000);
+    // Initialize search event listeners
+    const pickupInput = document.getElementById('pickup_input');
+    const dropoffInput = document.getElementById('dropoff_input');
+    
+    if (pickupInput) {
+        pickupInput.addEventListener('input', (e) => {
+            searchLocation(e.target.value, 'pickup_results', 'pickup_input', setPickupMarker);
+        });
+    }
+    
+    if (dropoffInput) {
+        dropoffInput.addEventListener('input', (e) => {
+            searchLocation(e.target.value, 'dropoff_results', 'dropoff_input', setDropoffMarker);
+        });
+    }
+    
+    // Hide search results when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.search-container')) {
+            const pickupResults = document.getElementById('pickup_results');
+            const dropoffResults = document.getElementById('dropoff_results');
+            if (pickupResults) pickupResults.style.display = 'none';
+            if (dropoffResults) dropoffResults.style.display = 'none';
+        }
+    });
 }
 
 // MARKER FUNCTIONS
@@ -85,18 +125,14 @@ function setPickupMarker(lat, lng) {
     pickupLon = lng;
     
     // Update UI Status
-    document.getElementById('pickup_status').innerHTML = `
-        <span class="text-green-600 font-medium">Selected</span>
-        <span class="text-gray-500"> · ${lat.toFixed(4)}, ${lng.toFixed(4)}</span>
-    `;
-    
-    // Update Badge Color
-    document.getElementById('pickup_zone_badge').style.backgroundColor = '#d1fae5'; // green-100
-    document.getElementById('pickup_zone_badge').style.color = '#065f46'; // green-800
-    document.getElementById('pickup_zone_badge').style.padding = '2px 8px';
-    document.getElementById('pickup_zone_badge').style.borderRadius = '4px';
-
-    drawRouteIfComplete();
+    const pickupStatus = document.getElementById('pickup_status');
+    if (pickupStatus) {
+        pickupStatus.innerHTML = `
+            <i class="fas fa-map-marker-alt mr-2"></i>
+            <span class="text-green-600 font-medium">Selected</span>
+            <span class="text-gray-500 ml-2">${lat.toFixed(4)}, ${lng.toFixed(4)}</span>
+        `;
+    }
 }
 
 function setDropoffMarker(lat, lng) {
@@ -123,18 +159,14 @@ function setDropoffMarker(lat, lng) {
     dropoffLon = lng;
     
     // Update UI Status
-    document.getElementById('dropoff_status').innerHTML = `
-        <span class="text-red-600 font-medium">Selected</span>
-        <span class="text-gray-500"> · ${lat.toFixed(4)}, ${lng.toFixed(4)}</span>
-    `;
-
-    // Update Badge Color
-    document.getElementById('dropoff_zone_badge').style.backgroundColor = '#fee2e2'; // red-100
-    document.getElementById('dropoff_zone_badge').style.color = '#991b1b'; // red-800
-    document.getElementById('dropoff_zone_badge').style.padding = '2px 8px';
-    document.getElementById('dropoff_zone_badge').style.borderRadius = '4px';
-    
-    drawRouteIfComplete();
+    const dropoffStatus = document.getElementById('dropoff_status');
+    if (dropoffStatus) {
+        dropoffStatus.innerHTML = `
+            <i class="fas fa-flag-checkered mr-2"></i>
+            <span class="text-red-600 font-medium">Selected</span>
+            <span class="text-gray-500 ml-2">${lat.toFixed(4)}, ${lng.toFixed(4)}</span>
+        `;
+    }
 }
 
 // SEARCH FUNCTIONALITY
@@ -144,8 +176,11 @@ function searchLocation(query, resultElementId, inputElementId, markerFunction) 
     clearTimeout(searchTimeout);
     
     if (query.length < 2) {
-        document.getElementById(resultElementId).style.display = 'none';
-        document.getElementById(resultElementId).innerHTML = '';
+        const list = document.getElementById(resultElementId);
+        if (list) {
+            list.style.display = 'none';
+            list.innerHTML = '';
+        }
         currentSearch = null;
         return;
     }
@@ -155,6 +190,8 @@ function searchLocation(query, resultElementId, inputElementId, markerFunction) 
         
         // Show loading
         const list = document.getElementById(resultElementId);
+        if (!list) return;
+        
         list.innerHTML = `
             <div class="search-item">
                 <div class="search-icon"><i class="fas fa-spinner fa-spin"></i></div>
@@ -188,6 +225,7 @@ function searchLocation(query, resultElementId, inputElementId, markerFunction) 
                 currentSearch = null;
             })
             .catch(err => {
+                console.error('Search error:', err);
                 list.innerHTML = `<div class="search-item">Error searching</div>`;
             });
     }, 300);
@@ -213,20 +251,6 @@ function selectSearchResult(item, inputElementId, markerFunction) {
     }
 }
 
-// Event listeners for search
-document.getElementById('pickup_input').addEventListener('input', (e) => {
-    searchLocation(e.target.value, 'pickup_results', 'pickup_input', setPickupMarker);
-});
-document.getElementById('dropoff_input').addEventListener('input', (e) => {
-    searchLocation(e.target.value, 'dropoff_results', 'dropoff_input', setDropoffMarker);
-});
-document.addEventListener('click', (e) => {
-    if (!e.target.closest('.search-container')) {
-        document.getElementById('pickup_results').style.display = 'none';
-        document.getElementById('dropoff_results').style.display = 'none';
-    }
-});
-
 function reverseGeocode(lat, lng, inputId) {
     fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18`)
         .then(res => res.json())
@@ -234,7 +258,8 @@ function reverseGeocode(lat, lng, inputId) {
             if (data.display_name) {
                 document.getElementById(inputId).value = data.display_name;
             }
-        });
+        })
+        .catch(err => console.error('Reverse geocode error:', err));
 }
 
 // ROUTE DRAWING
@@ -247,11 +272,15 @@ function drawRouteIfComplete() {
 function drawRoute() {
     if (routeLayer) map.removeLayer(routeLayer);
 
-    document.getElementById('pickup_status').innerHTML += ' <span class="text-blue-500">(Calculating route...)</span>';
+    // Show loading status
+    const loadingDiv = document.getElementById('loading');
+    if (loadingDiv) loadingDiv.classList.remove('hidden');
     
     fetch(`https://router.project-osrm.org/route/v1/driving/${pickupLon},${pickupLat};${dropoffLon},${dropoffLat}?overview=full&geometries=geojson`)
         .then(res => res.json())
         .then(data => {
+            if (loadingDiv) loadingDiv.classList.add('hidden');
+            
             if (data.routes && data.routes.length > 0) {
                 const route = data.routes[0];
                 const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
@@ -270,18 +299,17 @@ function drawRoute() {
                     [dropoffLat, dropoffLon]
                 ]);
                 map.fitBounds(bounds, { padding: [100, 100] });
-                
-                // Remove calculating text
-                const status = document.getElementById('pickup_status');
-                status.innerHTML = status.innerHTML.replace(' <span class="text-blue-500">(Calculating route...)</span>', '');
             }
+        })
+        .catch(err => {
+            if (loadingDiv) loadingDiv.classList.add('hidden');
+            console.error('Route drawing error:', err);
         });
 }
-
 // SWAP LOCATIONS
 function swapLocations() {
     if (!pickupLat || !dropoffLat) {
-        alert('Please select both pickup and dropoff locations first!');
+        showNotification('Please select both pickup and dropoff locations first!', 'error');
         return;
     }
     
@@ -301,68 +329,104 @@ function swapLocations() {
     
     reverseGeocode(pickupLat, pickupLon, 'pickup_input');
     reverseGeocode(dropoffLat, dropoffLon, 'dropoff_input');
+    
+    drawRouteIfComplete();
+    
+    showNotification('Locations swapped successfully!', 'success');
 }
 
 // CLEAR MAP
 function clearMap() {
-    if (pickupMarker) { map.removeLayer(pickupMarker); pickupMarker = null; pickupLat = null; pickupLon = null; }
-    if (dropoffMarker) { map.removeLayer(dropoffMarker); dropoffMarker = null; dropoffLat = null; dropoffLon = null; }
-    if (routeLayer) { map.removeLayer(routeLayer); routeLayer = null; }
+    if (pickupMarker) { 
+        map.removeLayer(pickupMarker); 
+        pickupMarker = null; 
+        pickupLat = null; 
+        pickupLon = null; 
+    }
+    if (dropoffMarker) { 
+        map.removeLayer(dropoffMarker); 
+        dropoffMarker = null; 
+        dropoffLat = null; 
+        dropoffLon = null; 
+    }
+    if (routeLayer) { 
+        map.removeLayer(routeLayer); 
+        routeLayer = null; 
+    }
     
     document.getElementById('pickup_input').value = '';
     document.getElementById('dropoff_input').value = '';
     document.getElementById('pickup_input').classList.remove('border-green-500', 'ring-2', 'ring-green-200');
     document.getElementById('dropoff_input').classList.remove('border-red-500', 'ring-2', 'ring-red-200');
     
-    document.getElementById('predictionResults').classList.add('hidden');
-    document.getElementById('predictionResults').innerHTML = ''; // Clear results
+    // Reset status displays
+    const pickupStatus = document.getElementById('pickup_status');
+    const dropoffStatus = document.getElementById('dropoff_status');
     
-    document.getElementById('pickup_status').textContent = 'Click on map or search above';
-    document.getElementById('dropoff_status').textContent = 'Click on map or search above';
+    if (pickupStatus) {
+        pickupStatus.innerHTML = `
+            <i class="fas fa-map-marker-alt mr-2"></i>
+            <span>No pickup location selected</span>
+        `;
+    }
     
-    document.getElementById('pickup_zone_badge').style.backgroundColor = '';
-    document.getElementById('dropoff_zone_badge').style.backgroundColor = '';
+    if (dropoffStatus) {
+        dropoffStatus.innerHTML = `
+            <i class="fas fa-flag-checkered mr-2"></i>
+            <span>No dropoff location selected</span>
+        `;
+    }
+    
+    // Hide results
+    const results = document.getElementById('predictionResults');
+    if (results) {
+        results.classList.add('hidden');
+        results.innerHTML = '';
+    }
     
     clickMode = 'pickup';
     map.setView([40.7580, -73.9855], 12);
+    
+    showNotification('Map cleared!', 'success');
 }
 
-// === PREDICTION FUNCTION (YANG DIPERBAIKI) ===
+// PREDICT DURATION FUNCTION
 function predictDuration() {
-    // 1. Validasi Input
-    if (!pickupLat || !dropoffLat) {
-        alert('Please select both pickup and dropoff locations first!');
+    // 1. Validate Input
+    if (!pickupLat || !pickupLon) {
+        alert('Please select a pickup location first!');
+        return;
+    }
+    
+    if (!dropoffLat || !dropoffLon) {
+        alert('Please select a dropoff location first!');
         return;
     }
 
-    // Ambil Data Input
+    // Get Input Data
     const hour = parseInt(document.getElementById('hour').value);
     const minute = parseInt(document.getElementById('minute').value);
     const daySelect = document.getElementById('day');
     const day = parseInt(daySelect.value); // 0=Monday, ... 6=Sunday
     const passengers = parseInt(document.getElementById('passengers').value);
     
-    // 2. Logic Datetime yang BENAR (Supaya tidak error di app.py)
+    // 2. Create datetime string
     const now = new Date();
     
-    // JS: 0=Sunday, 1=Monday...
-    // Input Kita: 0=Monday, 1=Tuesday...
-    // Konversi Input ke JS Day: (Input + 1) % 7
-    // Contoh: Input 0 (Mon) -> (0+1)%7 = 1 (Mon di JS). Input 6 (Sun) -> (6+1)%7 = 0 (Sun di JS)
+    // Convert input day to JS Day (0=Sunday)
     const targetJsDay = (day + 1) % 7; 
     const currentJsDay = now.getDay();
     
-    // Hitung berapa hari lagi menuju hari yang dipilih
+    // Calculate days difference
     let dayDiff = targetJsDay - currentJsDay;
-    if (dayDiff < 0) dayDiff += 7; // Kalau harinya lewat, ambil minggu depan
+    if (dayDiff < 0) dayDiff += 7;
     
-    // Buat objek tanggal baru
+    // Create target date
     const targetDate = new Date(now);
     targetDate.setDate(now.getDate() + dayDiff);
     targetDate.setHours(hour, minute, 0, 0);
     
-    // Konversi ke format string ISO lokal: "YYYY-MM-DDTHH:MM"
-    // Trik: Kurangi offset timezone supaya toISOString() tidak mengonversi ke UTC
+    // Convert to ISO string format
     const offset = targetDate.getTimezoneOffset() * 60000;
     const datetimeStr = (new Date(targetDate - offset)).toISOString().slice(0, 16);
 
@@ -371,6 +435,9 @@ function predictDuration() {
     const originalText = predictBtn.innerHTML;
     predictBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Predicting...';
     predictBtn.disabled = true;
+
+    const loadingDiv = document.getElementById('loading');
+    if (loadingDiv) loadingDiv.classList.remove('hidden');
 
     const payload = {
         pickup_lat: pickupLat,
@@ -400,9 +467,10 @@ function predictDuration() {
         // Reset Button
         predictBtn.innerHTML = originalText;
         predictBtn.disabled = false;
+        if (loadingDiv) loadingDiv.classList.add('hidden');
         
         if (data.status === 'success') {
-            displayPredictionResults(data, hour, daySelect.options[daySelect.selectedIndex].text);
+            displayPredictionResults(data, hour, minute, daySelect.options[daySelect.selectedIndex].text);
         } else {
             alert('Error: ' + (data.message || 'Unknown error'));
         }
@@ -411,41 +479,74 @@ function predictDuration() {
         console.error('Fetch error:', err);
         predictBtn.innerHTML = originalText;
         predictBtn.disabled = false;
+        if (loadingDiv) loadingDiv.classList.add('hidden');
         alert('Connection failed. Please check backend server.');
     });
 }
 
-// TAMPILKAN HASIL DI BAWAH (LAYOUT LENGKAP)
-// ... (KODE MAP, MARKER, PREDICT DI ATAS JANGAN DIHAPUS) ...
-
-// === FUNGSI TAMPILAN HASIL (REVISED) ===
-function displayPredictionResults(data, hour, dayName) {
+// DISPLAY PREDICTION RESULTS - SIMPLIFIED VERSION
+function displayPredictionResults(data, hour, minute, dayName) {
     const resultContainer = document.getElementById('predictionResults');
+    if (!resultContainer) return;
     
-    // 1. LOGIKA KONVERSI WAKTU (Minutes -> Hours & Minutes)
-    // Komen: Jika durasi > 59 menit, ubah format
+    // Convert minutes to hours and minutes
     let durationDisplay = "";
-    let durationSubtext = "";
-    const totalMinutes = parseInt(data.duration_minutes);
+    const totalMinutes = parseInt(data.duration_minutes || data.prediction || 0);
 
     if (totalMinutes > 59) {
         const h = Math.floor(totalMinutes / 60);
         const m = totalMinutes % 60;
-        // Logic: Kalau menitnya 0 (pas jam), jangan tampilkan "0 min"
         if (m === 0) {
-            durationDisplay = `${h} hr`;
+            durationDisplay = `${h} hour${h > 1 ? 's' : ''}`;
         } else {
-            durationDisplay = `${h} hr ${m} min`;
+            durationDisplay = `${h} hour${h > 1 ? 's' : ''} ${m} minute${m > 1 ? 's' : ''}`;
         }
-        durationSubtext = `(${totalMinutes} total minutes)`;
     } else {
-        durationDisplay = `${totalMinutes} min`;
-        durationSubtext = "Estimated travel time";
+        durationDisplay = `${totalMinutes} minute${totalMinutes > 1 ? 's' : ''}`;
     }
 
-    const isRushHour = (hour >= 7 && hour <= 9) || (hour >= 16 && hour <= 19);
+    // Determine traffic condition based on your notebook (8-10 & 15-18)
+    let isRushHour = false;
+    let trafficCondition = '';
+    let trafficColor = '';
+    let trafficIcon = '';
+    let trafficMessage = '';
+    let trafficDetails = '';
     
-    // Inject HTML ke dalam container di bawah Map
+    // Check if it's Rush Hour (8-10 AM or 3-6 PM)
+    if ((hour >= 8 && hour <= 10) || (hour >= 15 && hour <= 18)) {
+        isRushHour = true;
+        
+        // Determine if it's morning or evening rush
+        if (hour >= 8 && hour <= 10) {
+            trafficCondition = 'Morning Rush Hour';
+            trafficColor = 'orange';
+            trafficIcon = 'car';
+            trafficMessage = 'Heavy morning traffic expected';
+            trafficDetails = 'Morning peak hours (8-10 AM) typically experience heavy congestion due to commuters heading to work and school buses on the road.';
+        } else {
+            trafficCondition = 'Evening Rush Hour';
+            trafficColor = 'red';
+            trafficIcon = 'car-side';
+            trafficMessage = 'Peak evening congestion';
+            trafficDetails = 'Evening rush (3-6 PM) sees heavy traffic as people return from work, schools dismiss, and commercial activity peaks.';
+        }
+    } else {
+        // Non-Rush Hour
+        trafficCondition = 'Normal Traffic';
+        trafficColor = 'green';
+        trafficIcon = 'check-circle';
+        trafficMessage = 'Smooth traffic flow';
+        trafficDetails = 'Outside peak hours, traffic flows smoothly with minimal congestion. This is the optimal time for travel in NYC.';
+    }
+
+    // Calculate arrival time
+    const startTime = new Date();
+    startTime.setHours(hour, minute, 0, 0);
+    const arrivalTime = new Date(startTime.getTime() + totalMinutes * 60000);
+    const arrivalHour = arrivalTime.getHours().toString().padStart(2, '0');
+    const arrivalMinute = arrivalTime.getMinutes().toString().padStart(2, '0');
+    
     resultContainer.innerHTML = `
         <div class="bg-white rounded-2xl shadow-xl border border-blue-100 overflow-hidden animate-fade-in">
             <div class="h-2 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500"></div>
@@ -453,71 +554,145 @@ function displayPredictionResults(data, hour, dayName) {
             <div class="p-8">
                 <div class="flex flex-col md:flex-row gap-8 items-center md:items-start">
                     
+                    <!-- Left: Duration & Info -->
                     <div class="flex-1 text-center md:text-left min-w-[240px]">
-                        <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-2">Total Duration</h3>
+                        <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-2">Estimated Travel Time</h3>
                         <div class="text-6xl font-black text-gray-900 leading-none tracking-tight">
                             ${durationDisplay}
                         </div>
                         <div class="text-sm text-blue-500 font-medium mt-2">
-                            ${durationSubtext}
+                            From selected pickup to dropoff
                         </div>
 
                         <div class="flex gap-4 mt-6 justify-center md:justify-start">
-                            <div class="bg-gray-50 px-4 py-2 rounded-lg border border-gray-100">
+                            <div class="bg-gray-50 px-4 py-3 rounded-lg border border-gray-100">
                                 <div class="text-xs text-gray-500">Distance</div>
-                                <div class="text-lg font-bold text-gray-800">${data.distance_km} km</div>
+                                <div class="text-lg font-bold text-gray-800">${data.distance_km || 'N/A'} km</div>
                             </div>
-                            <div class="bg-gray-50 px-4 py-2 rounded-lg border border-gray-100">
-                                <div class="text-xs text-gray-500">Arrival</div>
-                                <div class="text-lg font-bold text-gray-800">
-                                    ${(parseInt(hour) + Math.floor(totalMinutes/60) + (totalMinutes%60 + 0 >= 60 ? 1 : 0)) % 24}:00
-                                </div>
+                            <div class="bg-gray-50 px-4 py-3 rounded-lg border border-gray-100">
+                                <div class="text-xs text-gray-500">Arrival Time</div>
+                                <div class="text-lg font-bold text-gray-800">${arrivalHour}:${arrivalMinute}</div>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                            <div class="flex items-center">
+                                <i class="fas fa-info-circle text-blue-600 mr-2"></i>
+                                <span class="text-sm text-blue-700">
+                                    Prediction based on NYC historical traffic patterns
+                                </span>
                             </div>
                         </div>
                     </div>
 
+                    <!-- Divider -->
                     <div class="hidden md:block w-px bg-gray-100 self-stretch"></div>
 
-                    <div class="flex-1 w-full space-y-4">
+                    <!-- Right: Traffic Information -->
+                    <div class="flex-1 w-full space-y-6">
                         
-                        <div class="flex items-center justify-between bg-gray-50 p-3 rounded-lg border border-gray-100">
-                            <div class="flex items-center">
-                                <div class="w-2 h-2 rounded-full ${isRushHour ? 'bg-red-500 animate-pulse' : 'bg-green-500'} mr-2"></div>
-                                <span class="text-sm font-semibold text-gray-700">Traffic Status</span>
-                            </div>
-                            <span class="text-sm font-bold ${isRushHour ? 'text-red-600' : 'text-green-600'}">
-                                ${isRushHour ? 'Heavy Traffic' : 'Smooth Flow'}
-                            </span>
-                        </div>
-
-                        <div class="space-y-3">
-                            <div class="flex items-start p-3 hover:bg-green-50 rounded-lg transition-colors border border-transparent hover:border-green-100">
-                                <div class="mt-1 mr-3 text-green-500"><i class="fas fa-map-marker-alt"></i></div>
+                        <!-- Traffic Status Card -->
+                        <div class="bg-white p-6 rounded-xl border-2 border-${trafficColor}-200 shadow-sm">
+                            <div class="flex items-center mb-4">
+                                <div class="w-12 h-12 rounded-full bg-${trafficColor}-100 flex items-center justify-center mr-4">
+                                    <i class="fas fa-${trafficIcon} text-${trafficColor}-600 text-xl"></i>
+                                </div>
                                 <div>
-                                    <div class="text-xs text-green-600 font-bold uppercase">Pickup Zone</div>
-                                    <div class="text-sm font-bold text-gray-800 leading-tight">${data.pickup_cluster.name}</div>
+                                    <h3 class="text-lg font-bold text-gray-900">${trafficCondition}</h3>
+                                    <p class="text-sm text-${trafficColor}-600 font-medium">${trafficMessage}</p>
                                 </div>
                             </div>
                             
-                            <div class="flex items-start p-3 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-100">
-                                <div class="mt-1 mr-3 text-red-500"><i class="fas fa-flag-checkered"></i></div>
-                                <div>
-                                    <div class="text-xs text-red-600 font-bold uppercase">Dropoff Zone</div>
-                                    <div class="text-sm font-bold text-gray-800 leading-tight">${data.dropoff_cluster.name}</div>
+                            <div class="mt-4">
+                                <div class="flex items-center text-sm text-gray-600 mb-2">
+                                    <i class="fas fa-calendar-day mr-2"></i>
+                                    <span>${dayName} at ${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}</span>
+                                </div>
+                                
+                                <!-- Traffic Level Indicator -->
+                                <div class="mt-4">
+                                    <div class="flex justify-between text-sm mb-2">
+                                        <span class="text-gray-600">Traffic Level</span>
+                                        <span class="font-bold text-${trafficColor}-600">
+                                            ${isRushHour ? 'High' : 'Normal'}
+                                        </span>
+                                    </div>
+                                    <div class="flex items-center space-x-1">
+                                        ${Array.from({length: 5}).map((_, i) => {
+                                            const active = isRushHour ? i >= 3 : i <= 2;
+                                            return `<div class="flex-1 h-2 rounded-full ${active ? `bg-${trafficColor}-500` : 'bg-gray-200'}"></div>`;
+                                        }).join('')}
+                                    </div>
+                                    <div class="text-xs text-gray-500 mt-2">
+                                        ${isRushHour ? 
+                                            'Peak hours: Heavy traffic expected' : 
+                                            'Off-peak: Smooth traffic flow'}
+                                    </div>
                                 </div>
                             </div>
                         </div>
+
+                        <!-- Traffic Details Card -->
+                        <div class="bg-gray-50 p-6 rounded-xl border border-gray-200">
+                            <div class="flex items-center mb-4">
+                                <div class="w-10 h-10 rounded-full bg-white border border-gray-300 flex items-center justify-center mr-3">
+                                    <i class="fas fa-traffic-light text-${trafficColor}-500"></i>
+                                </div>
+                                <h4 class="text-lg font-bold text-gray-900">Traffic Insights</h4>
+                            </div>
+                            
+                            <div class="space-y-3">
+                                <div class="flex items-start">
+                                    <i class="fas fa-info-circle text-${trafficColor}-500 mt-1 mr-3"></i>
+                                    <p class="text-gray-700 text-sm leading-relaxed">
+                                        ${trafficDetails}
+                                    </p>
+                                </div>
+                                
+                                <!-- Travel Tips -->
+                                <div class="mt-4 pt-3 border-t border-gray-200">
+                                    <div class="flex items-start">
+                                        <i class="fas fa-lightbulb text-yellow-500 mt-1 mr-3"></i>
+                                        <div>
+                                            <p class="text-gray-700 text-sm font-medium mb-1">💡 Travel Tip</p>
+                                            <p class="text-gray-600 text-sm">
+                                                ${isRushHour ? 
+                                                    (hour >= 8 && hour <= 10 ? 
+                                                        'Consider starting 15-20 minutes earlier to avoid peak morning congestion.' : 
+                                                        'Consider traveling after 6 PM when evening rush hour subsides.'
+                                                    ) : 
+                                                    'This is an optimal time for travel with minimal traffic delays.'
+                                                }
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-6 pt-4 border-t border-gray-200">
+                                <div class="flex items-center text-sm text-gray-500">
+                                    <i class="fas fa-database mr-2"></i>
+                                    <span>Based on NYC taxi data analysis (8-10 AM & 3-6 PM peak hours)</span>
+                                </div>
+                            </div>
+                        </div>
+
                     </div>
                 </div>
             </div>
         </div>
     `;
     
-    // Efek Scroll Smooth ke Hasil
+    // Show results with animation
     resultContainer.classList.remove('hidden');
-    // Scroll sedikit ke bawah agar hasil terlihat, tapi map tidak hilang total
-    resultContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    resultContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-// Initialize
-document.addEventListener('DOMContentLoaded', initializeMap);
+// Initialize map when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    // Check if we're on the duration page
+    const mapElement = document.getElementById('map');
+    if (mapElement) {
+        initializeMap();
+    }
+});
