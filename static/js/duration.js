@@ -10,10 +10,14 @@ function initializeMap() {
         attribution: '© OpenStreetMap'
     }).addTo(map);
 
-    // Set current time
+    // Set current time values on load
     const now = new Date();
     document.getElementById('hour').value = now.getHours();
-    document.getElementById('day').value = now.getDay() - 1;
+    
+    // Convert JS Day (0=Sun, 1=Mon) to our Select (0=Mon, 6=Sun)
+    let currentDayIdx = now.getDay() - 1;
+    if (currentDayIdx === -1) currentDayIdx = 6;
+    document.getElementById('day').value = currentDayIdx;
 
     // Map click handler
     map.on('click', function(e) {
@@ -48,19 +52,11 @@ function initializeMap() {
         }
     });
 
-    // Initialize with default locations
+    // Initialize with default locations (Example)
     setTimeout(() => {
-        setPickupMarker(40.7489, -73.9680);  // Times Square
-        document.getElementById('pickup_input').value = 'Times Square, New York';
-        reverseGeocode(40.7489, -73.9680, 'pickup_input');
-        
-        setDropoffMarker(40.7128, -74.0060);  // Wall Street
-        document.getElementById('dropoff_input').value = 'Wall Street, New York';
-        reverseGeocode(40.7128, -74.0060, 'dropoff_input');
-        
-        // Set click mode to dropoff since pickup is already set
-        clickMode = 'dropoff';
-        document.getElementById('pickup_input').classList.add('border-green-500', 'ring-2', 'ring-green-200');
+        // Optional: Pre-set markers for demo
+        // setPickupMarker(40.7489, -73.9680); 
+        // setDropoffMarker(40.7128, -74.0060);
     }, 1000);
 }
 
@@ -88,12 +84,18 @@ function setPickupMarker(lat, lng) {
     pickupLat = lat;
     pickupLon = lng;
     
-    // Update UI
+    // Update UI Status
     document.getElementById('pickup_status').innerHTML = `
         <span class="text-green-600 font-medium">Selected</span>
         <span class="text-gray-500"> · ${lat.toFixed(4)}, ${lng.toFixed(4)}</span>
     `;
     
+    // Update Badge Color
+    document.getElementById('pickup_zone_badge').style.backgroundColor = '#d1fae5'; // green-100
+    document.getElementById('pickup_zone_badge').style.color = '#065f46'; // green-800
+    document.getElementById('pickup_zone_badge').style.padding = '2px 8px';
+    document.getElementById('pickup_zone_badge').style.borderRadius = '4px';
+
     drawRouteIfComplete();
 }
 
@@ -120,11 +122,17 @@ function setDropoffMarker(lat, lng) {
     dropoffLat = lat;
     dropoffLon = lng;
     
-    // Update UI
+    // Update UI Status
     document.getElementById('dropoff_status').innerHTML = `
         <span class="text-red-600 font-medium">Selected</span>
         <span class="text-gray-500"> · ${lat.toFixed(4)}, ${lng.toFixed(4)}</span>
     `;
+
+    // Update Badge Color
+    document.getElementById('dropoff_zone_badge').style.backgroundColor = '#fee2e2'; // red-100
+    document.getElementById('dropoff_zone_badge').style.color = '#991b1b'; // red-800
+    document.getElementById('dropoff_zone_badge').style.padding = '2px 8px';
+    document.getElementById('dropoff_zone_badge').style.borderRadius = '4px';
     
     drawRouteIfComplete();
 }
@@ -149,160 +157,69 @@ function searchLocation(query, resultElementId, inputElementId, markerFunction) 
         const list = document.getElementById(resultElementId);
         list.innerHTML = `
             <div class="search-item">
-                <div class="search-icon">
-                    <i class="fas fa-spinner fa-spin"></i>
-                </div>
-                <div class="search-text">
-                    <div class="search-title">Searching...</div>
-                    <div class="search-subtitle">Looking for "${query}"</div>
-                </div>
-            </div>
-        `;
+                <div class="search-icon"><i class="fas fa-spinner fa-spin"></i></div>
+                <div class="search-text"><div class="search-title">Searching...</div></div>
+            </div>`;
         list.style.display = 'block';
         
         fetch(`/api/search?q=${encodeURIComponent(query)}&limit=8`)
             .then(res => res.json())
             .then(data => {
                 list.innerHTML = '';
-                
                 if (data.length === 0) {
-                    const item = document.createElement('div');
-                    item.className = 'search-item';
-                    item.innerHTML = `
-                        <div class="search-icon">
-                            <i class="fas fa-search"></i>
-                        </div>
-                        <div class="search-text">
-                            <div class="search-title">No results found</div>
-                            <div class="search-subtitle">Try a different search term</div>
-                        </div>
-                    `;
-                    list.appendChild(item);
+                    list.innerHTML = `<div class="search-item"><div class="search-text">No results found</div></div>`;
                 } else {
                     data.forEach((item, index) => {
                         const div = document.createElement('div');
                         div.className = 'search-item';
-                        div.dataset.index = index;
                         div.innerHTML = `
-                            <div class="search-icon">
-                                <i class="fas fa-map-marker-alt"></i>
-                            </div>
+                            <div class="search-icon"><i class="fas fa-map-marker-alt"></i></div>
                             <div class="search-text">
                                 <div class="search-title">${item.display_name.split(',')[0]}</div>
                                 <div class="search-subtitle">${formatAddress(item.display_name)}</div>
-                            </div>
-                            <div class="text-xs text-gray-400">
-                                <i class="fas fa-chevron-right"></i>
-                            </div>
-                        `;
-                        
+                            </div>`;
                         div.onclick = () => {
                             selectSearchResult(item, inputElementId, markerFunction);
                             list.style.display = 'none';
                         };
-                        
-                        div.onmouseenter = () => {
-                            highlightSearchResult(index, resultElementId);
-                        };
-                        
                         list.appendChild(div);
                     });
                 }
                 currentSearch = null;
             })
             .catch(err => {
-                list.innerHTML = `
-                    <div class="search-item">
-                        <div class="search-icon text-red-500">
-                            <i class="fas fa-exclamation-circle"></i>
-                        </div>
-                        <div class="search-text">
-                            <div class="search-title">Search failed</div>
-                            <div class="search-subtitle">Please try again</div>
-                        </div>
-                    </div>
-                `;
-                currentSearch = null;
+                list.innerHTML = `<div class="search-item">Error searching</div>`;
             });
-    }, 300); // Debounce 300ms
+    }, 300);
 }
 
 function formatAddress(fullAddress) {
     const parts = fullAddress.split(',');
     if (parts.length <= 3) return fullAddress;
-    
-    // Take the most relevant parts
     return parts.slice(1, 4).join(', ').substring(0, 60) + '...';
-}
-
-function highlightSearchResult(index, resultElementId) {
-    const items = document.querySelectorAll(`#${resultElementId} .search-item`);
-    items.forEach(item => item.classList.remove('active'));
-    
-    const activeItem = document.querySelector(`#${resultElementId} .search-item[data-index="${index}"]`);
-    if (activeItem) {
-        activeItem.classList.add('active');
-    }
 }
 
 function selectSearchResult(item, inputElementId, markerFunction) {
     document.getElementById(inputElementId).value = item.display_name;
     markerFunction(item.lat, item.lon);
-    
-    // Center map on selected location
     map.setView([item.lat, item.lon], 15);
     
-    // Update click mode
     if (markerFunction === setPickupMarker) {
         clickMode = 'dropoff';
-        document.getElementById('pickup_input').classList.add('border-green-500', 'ring-2', 'ring-green-200');
+        document.getElementById('pickup_input').classList.add('border-green-500');
     } else {
         clickMode = 'pickup';
-        document.getElementById('dropoff_input').classList.add('border-red-500', 'ring-2', 'ring-red-200');
+        document.getElementById('dropoff_input').classList.add('border-red-500');
     }
 }
 
-// Event listeners for search with keyboard support
+// Event listeners for search
 document.getElementById('pickup_input').addEventListener('input', (e) => {
     searchLocation(e.target.value, 'pickup_results', 'pickup_input', setPickupMarker);
 });
-
 document.getElementById('dropoff_input').addEventListener('input', (e) => {
     searchLocation(e.target.value, 'dropoff_results', 'dropoff_input', setDropoffMarker);
 });
-
-// Keyboard navigation for search results
-document.addEventListener('keydown', (e) => {
-    const activeInput = document.activeElement.id;
-    if (!['pickup_input', 'dropoff_input'].includes(activeInput)) return;
-    
-    const resultElementId = activeInput.replace('_input', '_results');
-    const list = document.getElementById(resultElementId);
-    if (list.style.display !== 'block') return;
-    
-    const items = Array.from(list.querySelectorAll('.search-item:not(:first-child)'));
-    const activeIndex = items.findIndex(item => item.classList.contains('active'));
-    
-    if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        const nextIndex = (activeIndex + 1) % items.length;
-        highlightSearchResult(nextIndex, resultElementId);
-        items[nextIndex].scrollIntoView({ block: 'nearest' });
-    } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        const prevIndex = activeIndex <= 0 ? items.length - 1 : activeIndex - 1;
-        highlightSearchResult(prevIndex, resultElementId);
-        items[prevIndex].scrollIntoView({ block: 'nearest' });
-    } else if (e.key === 'Enter') {
-        e.preventDefault();
-        const activeItem = list.querySelector('.search-item.active');
-        if (activeItem && activeItem.dataset.index !== undefined) {
-            activeItem.click();
-        }
-    }
-});
-
-// Close search results when clicking outside
 document.addEventListener('click', (e) => {
     if (!e.target.closest('.search-container')) {
         document.getElementById('pickup_results').style.display = 'none';
@@ -328,11 +245,8 @@ function drawRouteIfComplete() {
 }
 
 function drawRoute() {
-    if (routeLayer) {
-        map.removeLayer(routeLayer);
-    }
+    if (routeLayer) map.removeLayer(routeLayer);
 
-    // Show loading for route
     document.getElementById('pickup_status').innerHTML += ' <span class="text-blue-500">(Calculating route...)</span>';
     
     fetch(`https://router.project-osrm.org/route/v1/driving/${pickupLon},${pickupLat};${dropoffLon},${dropoffLat}?overview=full&geometries=geojson`)
@@ -342,7 +256,6 @@ function drawRoute() {
                 const route = data.routes[0];
                 const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
                 
-                // Draw route line
                 routeLayer = L.polyline(coords, {
                     color: '#3B82F6',
                     weight: 5,
@@ -352,37 +265,26 @@ function drawRoute() {
                     className: 'route-line'
                 }).addTo(map);
                 
-                // Fit bounds to show both markers and route
                 const bounds = L.latLngBounds([
                     [pickupLat, pickupLon],
                     [dropoffLat, dropoffLon]
                 ]);
                 map.fitBounds(bounds, { padding: [100, 100] });
                 
-                // Update distance display
-                const distanceKm = (route.distance / 1000).toFixed(1);
-                if (document.getElementById('distance_value')) {
-                    document.getElementById('distance_value').textContent = distanceKm + ' km';
-                }
-                
-                // Update status
-                document.getElementById('pickup_status').innerHTML = document.getElementById('pickup_status').innerHTML.replace('(Calculating route...)', '');
+                // Remove calculating text
+                const status = document.getElementById('pickup_status');
+                status.innerHTML = status.innerHTML.replace(' <span class="text-blue-500">(Calculating route...)</span>', '');
             }
-        })
-        .catch(err => {
-            console.error('Route calculation failed:', err);
-            document.getElementById('pickup_status').innerHTML = document.getElementById('pickup_status').innerHTML.replace('(Calculating route...)', '');
         });
 }
 
-// SWAP LOCATIONS FUNCTION
+// SWAP LOCATIONS
 function swapLocations() {
     if (!pickupLat || !dropoffLat) {
         alert('Please select both pickup and dropoff locations first!');
         return;
     }
     
-    // Swap coordinates
     const tempLat = pickupLat;
     const tempLon = pickupLon;
     const tempInput = document.getElementById('pickup_input').value;
@@ -397,35 +299,78 @@ function swapLocations() {
     document.getElementById('dropoff_input').value = tempInput;
     setDropoffMarker(dropoffLat, dropoffLon);
     
-    // Reverse geocode to update addresses
     reverseGeocode(pickupLat, pickupLon, 'pickup_input');
     reverseGeocode(dropoffLat, dropoffLon, 'dropoff_input');
 }
 
-// PREDICTION FUNCTION
+// CLEAR MAP
+function clearMap() {
+    if (pickupMarker) { map.removeLayer(pickupMarker); pickupMarker = null; pickupLat = null; pickupLon = null; }
+    if (dropoffMarker) { map.removeLayer(dropoffMarker); dropoffMarker = null; dropoffLat = null; dropoffLon = null; }
+    if (routeLayer) { map.removeLayer(routeLayer); routeLayer = null; }
+    
+    document.getElementById('pickup_input').value = '';
+    document.getElementById('dropoff_input').value = '';
+    document.getElementById('pickup_input').classList.remove('border-green-500', 'ring-2', 'ring-green-200');
+    document.getElementById('dropoff_input').classList.remove('border-red-500', 'ring-2', 'ring-red-200');
+    
+    document.getElementById('predictionResults').classList.add('hidden');
+    document.getElementById('predictionResults').innerHTML = ''; // Clear results
+    
+    document.getElementById('pickup_status').textContent = 'Click on map or search above';
+    document.getElementById('dropoff_status').textContent = 'Click on map or search above';
+    
+    document.getElementById('pickup_zone_badge').style.backgroundColor = '';
+    document.getElementById('dropoff_zone_badge').style.backgroundColor = '';
+    
+    clickMode = 'pickup';
+    map.setView([40.7580, -73.9855], 12);
+}
+
+// === PREDICTION FUNCTION (YANG DIPERBAIKI) ===
 function predictDuration() {
+    // 1. Validasi Input
     if (!pickupLat || !dropoffLat) {
         alert('Please select both pickup and dropoff locations first!');
         return;
     }
 
+    // Ambil Data Input
     const hour = parseInt(document.getElementById('hour').value);
     const minute = parseInt(document.getElementById('minute').value);
-    const day = parseInt(document.getElementById('day').value);
+    const daySelect = document.getElementById('day');
+    const day = parseInt(daySelect.value); // 0=Monday, ... 6=Sunday
     const passengers = parseInt(document.getElementById('passengers').value);
     
-    // Create datetime string - FIXED
+    // 2. Logic Datetime yang BENAR (Supaya tidak error di app.py)
     const now = new Date();
-    const datetime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute);
-    const datetimeStr = datetime.toISOString().slice(0, 16);
+    
+    // JS: 0=Sunday, 1=Monday...
+    // Input Kita: 0=Monday, 1=Tuesday...
+    // Konversi Input ke JS Day: (Input + 1) % 7
+    // Contoh: Input 0 (Mon) -> (0+1)%7 = 1 (Mon di JS). Input 6 (Sun) -> (6+1)%7 = 0 (Sun di JS)
+    const targetJsDay = (day + 1) % 7; 
+    const currentJsDay = now.getDay();
+    
+    // Hitung berapa hari lagi menuju hari yang dipilih
+    let dayDiff = targetJsDay - currentJsDay;
+    if (dayDiff < 0) dayDiff += 7; // Kalau harinya lewat, ambil minggu depan
+    
+    // Buat objek tanggal baru
+    const targetDate = new Date(now);
+    targetDate.setDate(now.getDate() + dayDiff);
+    targetDate.setHours(hour, minute, 0, 0);
+    
+    // Konversi ke format string ISO lokal: "YYYY-MM-DDTHH:MM"
+    // Trik: Kurangi offset timezone supaya toISOString() tidak mengonversi ke UTC
+    const offset = targetDate.getTimezoneOffset() * 60000;
+    const datetimeStr = (new Date(targetDate - offset)).toISOString().slice(0, 16);
 
-    // Show loading
+    // 3. UI Loading
     const predictBtn = document.getElementById('predictBtn');
     const originalText = predictBtn.innerHTML;
     predictBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Predicting...';
     predictBtn.disabled = true;
-    
-    document.getElementById('loading').classList.remove('hidden');
 
     const payload = {
         pickup_lat: pickupLat,
@@ -436,8 +381,9 @@ function predictDuration() {
         passengers: passengers
     };
 
-    console.log('📤 Sending prediction request:', payload);
+    console.log('Sending payload:', payload);
 
+    // 4. Fetch API
     fetch('/api/predict_duration', {
         method: 'POST',
         headers: { 
@@ -447,208 +393,131 @@ function predictDuration() {
         body: JSON.stringify(payload)
     })
     .then(res => {
-        console.log('📥 Response status:', res.status);
-        if (!res.ok) {
-            throw new Error(`HTTP error! status: ${res.status}`);
-        }
+        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
         return res.json();
     })
     .then(data => {
-        console.log('✅ Prediction response:', data);
-        
-        // Reset button
+        // Reset Button
         predictBtn.innerHTML = originalText;
         predictBtn.disabled = false;
         
-        document.getElementById('loading').classList.add('hidden');
-        
         if (data.status === 'success') {
-            displayPredictionResults(data);
+            displayPredictionResults(data, hour, daySelect.options[daySelect.selectedIndex].text);
         } else {
             alert('Error: ' + (data.message || 'Unknown error'));
         }
     })
     .catch(err => {
-        console.error('❌ Fetch error:', err);
+        console.error('Fetch error:', err);
         predictBtn.innerHTML = originalText;
         predictBtn.disabled = false;
-        document.getElementById('loading').classList.add('hidden');
-        alert('Connection failed. Please try again. Error: ' + err.message);
+        alert('Connection failed. Please check backend server.');
     });
 }
 
-// FUNGSI BARU: Display prediction results below map
-function displayPredictionResults(data) {
-    // Cari container untuk hasil prediksi
+// TAMPILKAN HASIL DI BAWAH (LAYOUT LENGKAP)
+// ... (KODE MAP, MARKER, PREDICT DI ATAS JANGAN DIHAPUS) ...
+
+// === FUNGSI TAMPILAN HASIL (REVISED) ===
+function displayPredictionResults(data, hour, dayName) {
     const resultContainer = document.getElementById('predictionResults');
     
-    // Format waktu
-    const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    const dayName = dayNames[data.time_info.day] || data.time_info.day;
+    // 1. LOGIKA KONVERSI WAKTU (Minutes -> Hours & Minutes)
+    // Komen: Jika durasi > 59 menit, ubah format
+    let durationDisplay = "";
+    let durationSubtext = "";
+    const totalMinutes = parseInt(data.duration_minutes);
+
+    if (totalMinutes > 59) {
+        const h = Math.floor(totalMinutes / 60);
+        const m = totalMinutes % 60;
+        // Logic: Kalau menitnya 0 (pas jam), jangan tampilkan "0 min"
+        if (m === 0) {
+            durationDisplay = `${h} hr`;
+        } else {
+            durationDisplay = `${h} hr ${m} min`;
+        }
+        durationSubtext = `(${totalMinutes} total minutes)`;
+    } else {
+        durationDisplay = `${totalMinutes} min`;
+        durationSubtext = "Estimated travel time";
+    }
+
+    const isRushHour = (hour >= 7 && hour <= 9) || (hour >= 16 && hour <= 19);
     
-    // Tampilkan hasil
+    // Inject HTML ke dalam container di bawah Map
     resultContainer.innerHTML = `
-        <div class="card-enhanced">
-            <div class="mb-8">
-                <h2 class="text-2xl font-bold text-gray-900 mb-2">Prediction Results</h2>
-                <p class="text-gray-600">${dayName} at ${data.time_info.hour}:00 • ${data.time_info.is_rush_hour ? '🚗 Rush Hour' : '🟢 Normal Traffic'}</p>
-            </div>
+        <div class="bg-white rounded-2xl shadow-xl border border-blue-100 overflow-hidden animate-fade-in">
+            <div class="h-2 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500"></div>
             
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
-                <!-- Duration Card -->
-                <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6 border border-blue-200">
-                    <div class="flex items-center mb-4">
-                        <div class="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center mr-4">
-                            <i class="fas fa-clock text-blue-600 text-xl"></i>
+            <div class="p-8">
+                <div class="flex flex-col md:flex-row gap-8 items-center md:items-start">
+                    
+                    <div class="flex-1 text-center md:text-left min-w-[240px]">
+                        <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-2">Total Duration</h3>
+                        <div class="text-6xl font-black text-gray-900 leading-none tracking-tight">
+                            ${durationDisplay}
                         </div>
-                        <div>
-                            <h4 class="text-sm font-medium text-gray-600">Estimated Duration</h4>
-                            <div class="text-4xl font-bold text-gray-900">${data.duration_minutes}<span class="text-lg text-gray-500 ml-2">min</span></div>
+                        <div class="text-sm text-blue-500 font-medium mt-2">
+                            ${durationSubtext}
                         </div>
-                    </div>
-                </div>
-                
-                <!-- Distance Card -->
-                <div class="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-6 border border-green-200">
-                    <div class="flex items-center mb-4">
-                        <div class="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center mr-4">
-                            <i class="fas fa-route text-green-600 text-xl"></i>
-                        </div>
-                        <div>
-                            <h4 class="text-sm font-medium text-gray-600">Distance</h4>
-                            <div class="text-4xl font-bold text-gray-900">${data.distance_km}<span class="text-lg text-gray-500 ml-2">km</span></div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Traffic Card -->
-                <div class="bg-gradient-to-br from-${data.time_info.is_rush_hour ? 'red' : 'green'}-50 to-${data.time_info.is_rush_hour ? 'orange' : 'emerald'}-50 rounded-2xl p-6 border border-${data.time_info.is_rush_hour ? 'red' : 'green'}-200">
-                    <div class="flex items-center mb-4">
-                        <div class="w-12 h-12 rounded-xl bg-${data.time_info.is_rush_hour ? 'red' : 'green'}-100 flex items-center justify-center mr-4">
-                            <i class="fas fa-traffic-light text-${data.time_info.is_rush_hour ? 'red' : 'green'}-600 text-xl"></i>
-                        </div>
-                        <div>
-                            <h4 class="text-sm font-medium text-gray-600">Traffic Condition</h4>
-                            <div class="text-2xl font-bold text-gray-900">${data.time_info.is_rush_hour ? 'Rush Hour' : 'Normal'}</div>
+
+                        <div class="flex gap-4 mt-6 justify-center md:justify-start">
+                            <div class="bg-gray-50 px-4 py-2 rounded-lg border border-gray-100">
+                                <div class="text-xs text-gray-500">Distance</div>
+                                <div class="text-lg font-bold text-gray-800">${data.distance_km} km</div>
+                            </div>
+                            <div class="bg-gray-50 px-4 py-2 rounded-lg border border-gray-100">
+                                <div class="text-xs text-gray-500">Arrival</div>
+                                <div class="text-lg font-bold text-gray-800">
+                                    ${(parseInt(hour) + Math.floor(totalMinutes/60) + (totalMinutes%60 + 0 >= 60 ? 1 : 0)) % 24}:00
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
-            </div>
-            
-            <!-- Zone Information -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-                <!-- Pickup Zone -->
-                <div class="rounded-2xl p-6 border-2 border-green-200 bg-white">
-                    <div class="flex items-center mb-6">
-                        <div class="w-10 h-10 rounded-full mr-4" style="background-color: ${data.pickup_cluster_color}"></div>
-                        <div>
-                            <h4 class="text-lg font-bold text-gray-900">Pickup Zone</h4>
-                            <p class="text-sm text-gray-600">${data.pickup_cluster_name}</p>
+
+                    <div class="hidden md:block w-px bg-gray-100 self-stretch"></div>
+
+                    <div class="flex-1 w-full space-y-4">
+                        
+                        <div class="flex items-center justify-between bg-gray-50 p-3 rounded-lg border border-gray-100">
+                            <div class="flex items-center">
+                                <div class="w-2 h-2 rounded-full ${isRushHour ? 'bg-red-500 animate-pulse' : 'bg-green-500'} mr-2"></div>
+                                <span class="text-sm font-semibold text-gray-700">Traffic Status</span>
+                            </div>
+                            <span class="text-sm font-bold ${isRushHour ? 'text-red-600' : 'text-green-600'}">
+                                ${isRushHour ? 'Heavy Traffic' : 'Smooth Flow'}
+                            </span>
                         </div>
-                    </div>
-                    <div class="space-y-3">
-                        <div class="flex justify-between">
-                            <span class="text-gray-600">Zone ID</span>
-                            <span class="font-semibold">${data.pickup_cluster}</span>
+
+                        <div class="space-y-3">
+                            <div class="flex items-start p-3 hover:bg-green-50 rounded-lg transition-colors border border-transparent hover:border-green-100">
+                                <div class="mt-1 mr-3 text-green-500"><i class="fas fa-map-marker-alt"></i></div>
+                                <div>
+                                    <div class="text-xs text-green-600 font-bold uppercase">Pickup Zone</div>
+                                    <div class="text-sm font-bold text-gray-800 leading-tight">${data.pickup_cluster.name}</div>
+                                </div>
+                            </div>
+                            
+                            <div class="flex items-start p-3 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-100">
+                                <div class="mt-1 mr-3 text-red-500"><i class="fas fa-flag-checkered"></i></div>
+                                <div>
+                                    <div class="text-xs text-red-600 font-bold uppercase">Dropoff Zone</div>
+                                    <div class="text-sm font-bold text-gray-800 leading-tight">${data.dropoff_cluster.name}</div>
+                                </div>
+                            </div>
                         </div>
-                        <div class="flex justify-between">
-                            <span class="text-gray-600">Coordinates</span>
-                            <span class="font-mono text-sm">${data.pickup_coords[0].toFixed(4)}, ${data.pickup_coords[1].toFixed(4)}</span>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Dropoff Zone -->
-                <div class="rounded-2xl p-6 border-2 border-red-200 bg-white">
-                    <div class="flex items-center mb-6">
-                        <div class="w-10 h-10 rounded-full mr-4" style="background-color: ${data.dropoff_cluster_color}"></div>
-                        <div>
-                            <h4 class="text-lg font-bold text-gray-900">Dropoff Zone</h4>
-                            <p class="text-sm text-gray-600">${data.dropoff_cluster_name}</p>
-                        </div>
-                    </div>
-                    <div class="space-y-3">
-                        <div class="flex justify-between">
-                            <span class="text-gray-600">Zone ID</span>
-                            <span class="font-semibold">${data.dropoff_cluster}</span>
-                        </div>
-                        <div class="flex justify-between">
-                            <span class="text-gray-600">Coordinates</span>
-                            <span class="font-mono text-sm">${data.dropoff_coords[0].toFixed(4)}, ${data.dropoff_coords[1].toFixed(4)}</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Traffic Information -->
-            <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-6 border border-blue-200">
-                <div class="flex items-center">
-                    <i class="fas fa-info-circle text-blue-600 text-xl mr-4"></i>
-                    <div>
-                        <p class="text-gray-700">
-                            ${data.time_info.is_rush_hour ? 
-                                '🚨 <strong>Rush hour detected:</strong> Traffic may increase travel time by 15-30%. Consider alternative routes.' : 
-                                '✅ <strong>Normal traffic conditions:</strong> Expected smooth travel with minimal delays.'}
-                        </p>
-                        <p class="text-sm text-gray-600 mt-2">
-                            Prediction based on historical taxi trip patterns and current time/day analysis.
-                        </p>
                     </div>
                 </div>
             </div>
         </div>
     `;
     
-    // Show results
+    // Efek Scroll Smooth ke Hasil
     resultContainer.classList.remove('hidden');
-    resultContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // Scroll sedikit ke bawah agar hasil terlihat, tapi map tidak hilang total
+    resultContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-// HELPER FUNCTIONS
-function clearMap() {
-    if (pickupMarker) {
-        map.removeLayer(pickupMarker);
-        pickupMarker = null;
-        pickupLat = null;
-        pickupLon = null;
-    }
-    if (dropoffMarker) {
-        map.removeLayer(dropoffMarker);
-        dropoffMarker = null;
-        dropoffLat = null;
-        dropoffLon = null;
-    }
-    if (routeLayer) {
-        map.removeLayer(routeLayer);
-        routeLayer = null;
-    }
-    
-    document.getElementById('pickup_input').value = '';
-    document.getElementById('dropoff_input').value = '';
-    document.getElementById('pickup_input').classList.remove('border-green-500', 'ring-2', 'ring-green-200');
-    document.getElementById('dropoff_input').classList.remove('border-red-500', 'ring-2', 'ring-red-200');
-    document.getElementById('result_card').classList.add('hidden');
-    
-    // Reset status
-    document.getElementById('pickup_status').textContent = 'Click on map or search above';
-    document.getElementById('dropoff_status').textContent = 'Click on map or search above';
-    
-    // Reset badges
-    document.getElementById('pickup_zone_badge').style.backgroundColor = '';
-    document.getElementById('dropoff_zone_badge').style.backgroundColor = '';
-    
-    clickMode = 'pickup'; // Reset to pickup mode
-    
-    // Reset map view
-    map.setView([40.7580, -73.9855], 12);
-
-    // Hapus hasil prediksi jika ada
-    const resultContainer = document.getElementById('predictionResults');
-    if (resultContainer) {
-        resultContainer.classList.remove('active');
-        resultContainer.innerHTML = '';
-    }
-}
-
-// Initialize when DOM is loaded
+// Initialize
 document.addEventListener('DOMContentLoaded', initializeMap);
