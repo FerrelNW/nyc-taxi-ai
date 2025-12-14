@@ -1,0 +1,72 @@
+{
+    "1": {
+        "avg_trips": "198,005 trips",
+        "avg_duration": "12 min",
+        "avg_speed": "14.6 km/h",
+        "avg_pax": "1.6 org",
+        "peak_time": "08:00 - 09:00"
+    },
+    "6": {
+        "avg_trips": "12,809 trips",
+        "avg_duration": "13 min",
+        "avg_speed": "16.5 km/h",
+        "avg_pax": "1.7 org",
+        "peak_time": "00:00 - 01:00"
+    },
+    "3": {
+        "avg_trips": "390,548 trips",
+        "avg_duration": "13 min",
+        "avg_speed": "13.4 km/h",
+        "avg_pax": "1.7 org",
+        "peak_time": "19:00 - 20:00"
+    },
+    "5": {
+        "avg_trips": "40,210 trips",
+        "avg_duration": "28 min",
+        "avg_speed": "21.4 km/h",
+        "avg_pax": "1.7 org",
+        "peak_time": "23:00 - 24:00"
+    },
+    "9": {
+        "avg_trips": "4,837 trips",
+        "avg_duration": "13 min",
+        "avg_speed": "19.4 km/h",
+        "avg_pax": "1.6 org",
+        "peak_time": "08:00 - 09:00"
+    },
+    "4": {
+        "avg_trips": "14,197 trips",
+        "avg_duration": "14 min",
+        "avg_speed": "16.9 km/h",
+        "avg_pax": "1.6 org",
+        "peak_time": "23:00 - 24:00"
+    },
+    "8": {
+        "avg_trips": "100,232 trips",
+        "avg_duration": "11 min",
+        "avg_speed": "16.0 km/h",
+        "avg_pax": "1.7 org",
+        "peak_time": "18:00 - 19:00"
+    },
+    "7": {
+        "avg_trips": "425,113 trips",
+        "avg_duration": "13 min",
+        "avg_speed": "13.6 km/h",
+        "avg_pax": "1.7 org",
+        "peak_time": "18:00 - 19:00"
+    },
+    "2": {
+        "avg_trips": "31,262 trips",
+        "avg_duration": "41 min",
+        "avg_speed": "28.2 km/h",
+        "avg_pax": "1.7 org",
+        "peak_time": "20:00 - 21:00"
+    },
+    "0": {
+        "avg_trips": "189,270 trips",
+        "avg_duration": "14 min",
+        "avg_speed": "14.7 km/h",
+        "avg_pax": "1.7 org",
+        "peak_time": "22:00 - 23:00"
+    }
+}

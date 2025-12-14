@@ -209,6 +209,28 @@ def get_clusters():
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
+@app.route('/api/cluster_stats', methods=['GET'])
+def get_cluster_stats():
+    """Return cluster statistics from JSON file"""
+    try:
+        # Try to load from models directory first
+        stats_path = 'cluster_stats.json'
+        if not os.path.exists(stats_path):
+            stats_path = MODEL_PATH + 'cluster_stats.json'
+        
+        with open(stats_path, 'r') as f:
+            stats_data = json.load(f)
+        
+        # Convert keys to integers for consistency
+        stats_dict = {int(k): v for k, v in stats_data.items()}
+        
+        return jsonify({'status': 'success', 'stats': stats_dict})
+    
+    except Exception as e:
+        print(f"Error loading cluster stats: {e}")
+        # Return empty stats if file not found
+        return jsonify({'status': 'success', 'stats': {}})
+
 @app.route('/api/predict_duration', methods=['POST'])
 def predict_duration():
     """Predict travel duration between two points"""
@@ -561,6 +583,8 @@ if __name__ == '__main__':
     print("   /duration           - Duration prediction")
     print("   /destination        - Destination prediction")
     print("   /test               - Cluster visualization")
+    print("   /api/clusters       - Get clusters data")
+    print("   /api/cluster_stats  - Get cluster statistics")
     print("   /api/predict_duration   - Duration API")
     print("   /api/predict_destination - Destination API")
     print("="*50 + "\n")

@@ -93,7 +93,7 @@
             NYC Taxi Zones Visualization
         </h1>
         <p class="text-gray-600">
-            Visualization of 10 NYC taxi zones using clustering
+            Interactive visualization of 10 NYC taxi zones using K-Means clustering
         </p>
     </div>
 
@@ -114,7 +114,7 @@
                 </div>
 
                 <p class="text-sm text-gray-600 mb-4">
-                    Zones are grouped using K-Means clustering based on NYC taxi trip data.
+                    Zones are clustered based on NYC taxi trip patterns using K-Means algorithm.
                 </p>
 
                 <div class="bg-blue-50 p-3 rounded-lg border border-blue-200 mb-6">
@@ -155,10 +155,10 @@
                 <div class="p-4 border-b border-gray-200 flex justify-between items-center">
                     <div>
                         <h3 class="font-semibold text-gray-800">
-                            NYC Taxi Clusters Map
+                            NYC Taxi Zones Map
                         </h3>
                         <p class="text-xs text-gray-500 mt-1">
-                            Each circle represents a zone with a 1.5 km radius
+                            Each circle represents a zone with a 1.5 km radius from the cluster center
                         </p>
                     </div>
                     <div class="flex space-x-2">
@@ -217,21 +217,25 @@
                             <!-- RIGHT -->
                             <div>
                                 <h4 class="font-semibold text-gray-800 mb-2">
-                                    Statistics (Simulation)
+                                    Real Statistics
                                 </h4>
 
                                 <div class="cluster-stats">
                                     <div class="stat-item">
                                         <span class="text-gray-600">Average Trips:</span>
-                                        <span class="font-semibold" id="avgTrip">--</span>
+                                        <span class="font-semibold" id="avgTrips">--</span>
                                     </div>
                                     <div class="stat-item">
                                         <span class="text-gray-600">Average Duration:</span>
                                         <span class="font-semibold" id="avgDuration">--</span>
                                     </div>
                                     <div class="stat-item">
-                                        <span class="text-gray-600">Average Fare:</span>
-                                        <span class="font-semibold" id="avgFare">--</span>
+                                        <span class="text-gray-600">Average Speed:</span>
+                                        <span class="font-semibold" id="avgSpeed">--</span>
+                                    </div>
+                                    <div class="stat-item">
+                                        <span class="text-gray-600">Average Passengers:</span>
+                                        <span class="font-semibold" id="avgPax">--</span>
                                     </div>
                                     <div class="stat-item">
                                         <span class="text-gray-600">Peak Time:</span>
@@ -239,12 +243,6 @@
                                     </div>
                                 </div>
 
-                                <div class="mt-4">
-                                    <h4 class="font-semibold text-gray-800 mb-2">
-                                        Related Zones
-                                    </h4>
-                                    <div id="relatedZones" class="flex flex-wrap gap-2"></div>
-                                </div>
                             </div>
 
                         </div>
@@ -270,6 +268,7 @@
     let clusterLayers = [];
     let selectedCluster = null;
     let clustersVisible = true;
+    let clusterStats = {}; // Store loaded statistics
 
     // Load clusters from API
     async function loadClusters() {
@@ -282,6 +281,9 @@
                 displayClusters(clusters);
                 createClusterList(clusters);
                 document.getElementById('clustersCount').textContent = `${clusters.length} zones`;
+                
+                // Load statistics
+                await loadClusterStats();
             }
         } catch (error) {
             console.error('Error loading clusters:', error);
@@ -294,6 +296,21 @@
         }
     }
 
+    // Load cluster statistics
+    async function loadClusterStats() {
+        try {
+            const response = await fetch('/api/cluster_stats');
+            const data = await response.json();
+            
+            if (data.status === 'success') {
+                clusterStats = data.stats;
+                console.log('Loaded cluster statistics:', clusterStats);
+            }
+        } catch (error) {
+            console.error('Error loading cluster stats:', error);
+            clusterStats = {};
+        }
+    }
 
     function displayClusters(clusters) {
         // Clear existing layers
@@ -363,11 +380,11 @@
                         <div class="flex items-center mb-1">
                             <div class="cluster-dot" style="background-color: ${cluster.color}"></div>
                             <div>
-                                <h4 class="font-bold text-gray-900">Zona ${cluster.id}</h4>
+                                <h4 class="font-bold text-gray-900">Zone ${cluster.id}</h4>
                                 <p class="text-sm text-gray-700">${cluster.name}</p>
                             </div>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">${cluster.type}</p>
+                        <p class="text-xs text-gray-500 mt-2">${cluster.type} • ${cluster.radius} km radius</p>
                     </div>
                     <button class="text-gray-400 hover:text-blue-600 ml-2">
                         <i class="fas fa-chevron-right"></i>
@@ -385,37 +402,12 @@
         });
     }
 
-    // function createLegend(clusters) {
-    //     const container = document.getElementById('legendContainer');
-    //     container.innerHTML = '';
-
-    //     clusters.forEach(cluster => {
-    //         const item = document.createElement('div');
-    //         item.className = 'legend-item';
-    //         item.dataset.clusterId = cluster.id;
-            
-    //         item.innerHTML = `
-    //             <div class="cluster-dot" style="background-color: ${cluster.color}"></div>
-    //             <span class="flex-1 text-gray-700">Zona ${cluster.id}</span>
-    //             <span class="text-gray-400 text-xs">${cluster.type}</span>
-    //         `;
-
-    //         item.addEventListener('click', () => {
-    //             selectCluster(cluster);
-    //         });
-
-    //         container.appendChild(item);
-    //     });
-    // }
-
     function selectCluster(cluster) {
         // Remove previous selection
         if (selectedCluster) {
             const prevCard = document.querySelector(`.cluster-info-card[data-cluster-id="${selectedCluster.id}"]`);
-           // const prevLegend = document.querySelector(`.legend-item[data-cluster-id="${selectedCluster.id}"]`);
             
-          //  if (prevCard) prevCard.classList.remove('selected');
-          //  if (prevLegend) prevLegend.style.backgroundColor = '';
+            if (prevCard) prevCard.classList.remove('selected');
             
             // Reset circle style
             const prevCircle = clusterLayers.find(layer => 
@@ -451,78 +443,60 @@
                 duration: 1
             });
 
-            // Highlight card and legend
+            // Highlight card
             const card = document.querySelector(`.cluster-info-card[data-cluster-id="${cluster.id}"]`);
-           //  const legend = document.querySelector(`.legend-item[data-cluster-id="${cluster.id}"]`);
-            
             if (card) card.classList.add('selected');
-            // if (legend) legend.style.backgroundColor = '#f3f4f6';
-
-
 
             // Show details
             showClusterDetails(cluster);
         }
     }
 
-    function showClusterDetails(cluster) {
-        // Generate mock statistics based on cluster ID
-        const stats = generateMockStats(cluster.id);
+    async function showClusterDetails(cluster) {
+        // Get real statistics
+        const stats = await getRealStats(cluster.id);
         
         // Update details
-        document.getElementById('detailTitle').textContent = `Zona ${cluster.id}: ${cluster.name}`;
+        document.getElementById('detailTitle').textContent = `Zone ${cluster.id}: ${cluster.name}`;
         document.getElementById('detailColor').style.backgroundColor = cluster.color;
         document.getElementById('detailType').textContent = cluster.type;
-        document.getElementById('detailDescription').textContent =
-    getEnglishDescription(cluster);
+        document.getElementById('detailDescription').textContent = getEnglishDescription(cluster);
 
         document.getElementById('detailCoordinates').textContent = `${cluster.center[0].toFixed(4)}, ${cluster.center[1].toFixed(4)}`;
         
-        document.getElementById('avgTrip').textContent = stats.avgTrips;
-        document.getElementById('avgDuration').textContent = stats.avgDuration;
-        document.getElementById('avgFare').textContent = stats.avgFare;
-        document.getElementById('peakTime').textContent = stats.peakTime;
-        
-        // Generate related zones
-        const relatedZones = getRelatedZones(cluster.id);
-        const relatedContainer = document.getElementById('relatedZones');
-        relatedContainer.innerHTML = '';
-
-        relatedZones.forEach(zoneId => {
-            const relatedCluster = clusters.find(c => c.id === zoneId);
-            if (!relatedCluster) return;
-
-            const badge = document.createElement('span');
-            badge.className =
-                'px-3 py-1 rounded-full text-xs font-medium cursor-pointer hover:opacity-80';
-            badge.style.backgroundColor = relatedCluster.color + '20';
-            badge.style.color = relatedCluster.color;
-            badge.textContent = `Zone ${zoneId}`;
-            badge.onclick = () => selectCluster(relatedCluster);
-            relatedContainer.appendChild(badge);
-        });
-
+        // Update statistics with real data
+        document.getElementById('avgTrips').textContent = stats.avgTrips || '--';
+        document.getElementById('avgDuration').textContent = stats.avgDuration || '--';
+        document.getElementById('avgSpeed').textContent = stats.avgSpeed || '--';
+        document.getElementById('avgPax').textContent = stats.avgPax || '--';
+        document.getElementById('peakTime').textContent = stats.peakTime || '--';
         
         // Show details panel
         document.getElementById('clusterDetails').classList.remove('hidden');
-        
     }
 
-    function generateMockStats(clusterId) {
-        // Mock statistics for demonstration
-        const stats = {
-            avgTrips: Math.floor(Math.random() * 5000) + 1000 + ' per day',
-            avgDuration: Math.floor(Math.random() * 25) + 10 + ' min',
-            avgFare: '$' + (Math.random() * 30 + 15).toFixed(2),
-            peakTime: ['07:00-09:00', '12:00-14:00', '17:00-19:00'][clusterId % 3]
-        };
-        return stats;
-    }
-
-    function getRelatedZones(clusterId) {
-        // Mock related zones based on proximity
-        const allZones = Array.from({length: 10}, (_, i) => i);
-        return allZones.filter(id => id !== clusterId && Math.abs(id - clusterId) <= 2).slice(0, 3);
+    // Get real statistics for a cluster
+    async function getRealStats(clusterId) {
+        if (clusterStats[clusterId]) {
+            const stats = clusterStats[clusterId];
+            return {
+                avgTrips: stats.avg_trips,
+                avgDuration: stats.avg_duration,
+                avgSpeed: stats.avg_speed,
+                avgPax: stats.avg_pax,
+                peakTime: stats.peak_time
+            };
+        } else {
+            // Fallback if no stats found
+            console.warn(`No statistics found for cluster ${clusterId}`);
+            return {
+                avgTrips: 'No data',
+                avgDuration: 'No data',
+                avgSpeed: 'No data',
+                avgPax: 'No data',
+                peakTime: 'No data'
+            };
+        }
     }
 
     function closeDetails() {
@@ -530,9 +504,6 @@
         if (selectedCluster) {
             const card = document.querySelector(`.cluster-info-card[data-cluster-id="${selectedCluster.id}"]`);
             if (card) card.classList.remove('selected');
-            
-           //  const legend = document.querySelector(`.legend-item[data-cluster-id="${selectedCluster.id}"]`);
-           // if (legend) legend.style.backgroundColor = '';
             
             // Reset circle style
             const circle = clusterLayers.find(layer => 
@@ -549,27 +520,25 @@
             }
             
             selectedCluster = null;
-
         }
     }
-// tambahan deskripsi bahasa inggris
+
     function getEnglishDescription(cluster) {
-    const descriptions = {
-        0: "Major business and financial district with high taxi demand.",
-        1: "Upscale residential area with museums and access to Roosevelt Island.",
-        2: "International airport zone with long-distance travel demand.",
-        3: "Lifestyle, technology, and creative business area.",
-        4: "Dense residential neighborhood with local mobility.",
-        5: "Airport-related mixed commercial and residential area.",
-        6: "Trendy area known for nightlife and young population.",
-        7: "Tourism and business hotspot with high trip frequency.",
-        8: "Residential and academic environment with steady demand.",
-        9: "Mixed residential area with balanced trip patterns."
-    };
-
-    return descriptions[cluster.id] || "Urban taxi activity zone.";
-}
-
+        const descriptions = {
+            0: "Major business and financial district with high taxi demand during business hours. Wall Street, World Trade Center, and Tribeca areas.",
+            1: "Upscale residential area with museums and access to Roosevelt Island. Family-oriented neighborhood.",
+            2: "JFK International Airport zone with long-distance travel demand and high-value trips.",
+            3: "Lifestyle, technology, and creative business area. Known for restaurants, shopping, and tech startups.",
+            4: "Dense residential neighborhood in Brooklyn with local mobility patterns and park access.",
+            5: "LaGuardia Airport area mixed with commercial and residential zones in Astoria/Queens.",
+            6: "Trendy area known for nightlife, arts, cafes, and young population in North Brooklyn.",
+            7: "Tourism and business hotspot with extremely high trip frequency. Times Square, Theater District.",
+            8: "Residential and academic environment with steady demand. Columbia University and Lincoln Center area.",
+            9: "Mixed residential area with balanced trip patterns connecting to the Bronx."
+        };
+        
+        return descriptions[cluster.id] || "Urban taxi activity zone with balanced trip patterns.";
+    }
 
     function fitToAllClusters() {
         if (clusterLayers.length > 0) {
@@ -591,10 +560,10 @@
         
         if (clustersVisible) {
             clusterLayers.forEach(layer => map.addLayer(layer));
-            btn.innerHTML = '<i class="fas fa-eye-slash mr-2"></i><span>Sembunyikan Zona</span>';
+            btn.innerHTML = '<i class="fas fa-eye-slash mr-2"></i><span>Hide Zones</span>';
         } else {
             clusterLayers.forEach(layer => map.removeLayer(layer));
-            btn.innerHTML = '<i class="fas fa-eye mr-2"></i><span>Tampilkan Zona</span>';
+            btn.innerHTML = '<i class="fas fa-eye mr-2"></i><span>Show Zones</span>';
             
             // Close details if open
             if (selectedCluster) {
@@ -603,7 +572,7 @@
         }
     }
 
-    // Global clusters variable for related zones function
+    // Global clusters variable
     let clusters = [];
 
     // Load clusters on page load
