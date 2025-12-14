@@ -83,24 +83,24 @@ CLUSTER_NAMES = {
 def load_models():
     """Load all ML models and cluster data"""
     try:
-        print("🔄 Loading models from:", MODEL_PATH)
+        print("Loading models from:", MODEL_PATH)
         
         # Model 1: Duration Prediction
         print("  Loading XGBoost duration model...")
         models['xgb_duration'] = joblib.load(MODEL_PATH + 'xgb_problem1_final.pkl')
         models['feat_duration'] = joblib.load(MODEL_PATH + 'features_problem1_final.pkl')
-        print(f"    ✅ Duration features: {len(models['feat_duration'])}")
+        print(f"    Duration features: {len(models['feat_duration'])}")
         
         # Model 2: Destination Prediction
         print("  Loading LightGBM destination model...")
         models['lgb_dest'] = joblib.load(MODEL_PATH + 'lgbm_destination_prediction.pkl')
         models['feat_dest'] = joblib.load(MODEL_PATH + 'features_problem2_final.pkl')
-        print(f"    ✅ Destination features: {len(models['feat_dest'])}")
+        print(f"    Destination features: {len(models['feat_dest'])}")
         
         # K-Means Clustering Model
         print("  Loading K-Means clustering model...")
         models['kmeans'] = joblib.load(MODEL_PATH + 'kmeans_pickup.pkl')
-        print(f"    ✅ K-Means n_clusters: {models['kmeans'].n_clusters}")
+        print(f"    K-Means n_clusters: {models['kmeans'].n_clusters}")
         
         # Load cluster centroids
         print("  Loading cluster centroids...")
@@ -120,18 +120,18 @@ def load_models():
                     'description': CLUSTER_NAMES[i]['description']
                 })
             else:
-                print(f"⚠️  Skipping centroid {i} - no cluster name mapping")
+                print(f"WARNING: Skipping centroid {i} - no cluster name mapping")
         
-        print(f"\n✅ All models loaded successfully")
-        print(f"✅ Cluster centroids loaded: {len(models['cluster_centroids'])} zones")
+        print(f"\nAll models loaded successfully")
+        print(f"Cluster centroids loaded: {len(models['cluster_centroids'])} zones")
         
         # Verify feature compatibility
-        print("\n🔍 Feature Verification:")
+        print("\nFeature Verification:")
         print(f"  Duration model expects {len(models['feat_duration'])} features")
         print(f"  Destination model expects {len(models['feat_dest'])} features")
         
     except Exception as e:
-        print(f"❌ Error loading models: {e}")
+        print(f"Error loading models: {e}")
         traceback.print_exc()
         raise e
 
@@ -214,12 +214,12 @@ def predict_duration():
     """Predict travel duration between two points"""
     try:
         data = request.json
-        print(f"🔍 Received duration prediction request: {data}")
+        print(f"Received duration prediction request: {data}")
         
         # FIX: Debug waktu
         dt = datetime.strptime(data['datetime'], '%Y-%m-%dT%H:%M')
-        print(f"🕒 Parsed datetime: {dt}")
-        print(f"🕒 Hour: {dt.hour}, Minute: {dt.minute}, Day: {dt.weekday()}")
+        print(f"Parsed datetime: {dt}")
+        print(f"Hour: {dt.hour}, Minute: {dt.minute}, Day: {dt.weekday()}")
         
         # Validate input
         p_lat = float(data.get('pickup_lat', 0))
@@ -287,7 +287,7 @@ def predict_duration():
         missing_features = [c for c in models['feat_duration'] if c not in df_in.columns]
         
         if missing_features:
-            print(f"⚠️  Missing features for duration model: {missing_features}")
+            print(f"WARNING: Missing features for duration model: {missing_features}")
             # Add missing features with default values
             for feat in missing_features:
                 df_in[feat] = 0
@@ -323,11 +323,11 @@ def predict_duration():
             }
         }
         
-        print(f"✅ Duration prediction successful: {response['duration_minutes']} minutes")
+        print(f"Duration prediction successful: {response['duration_minutes']} minutes")
         return jsonify(response)
         
     except Exception as e:
-        print(f"❌ Error in predict_duration: {e}")
+        print(f"Error in predict_duration: {e}")
         traceback.print_exc()
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
@@ -336,7 +336,7 @@ def predict_destination():
     """Predict top 3 destination clusters based on pickup location"""
     try:
         data = request.json
-        print(f"🔍 Received destination prediction request: {data}")
+        print(f"Received destination prediction request: {data}")
         
         # Validate input
         p_lat = float(data.get('pickup_lat', 40.7580))
@@ -377,14 +377,14 @@ def predict_destination():
             'month_cos': m_cos
         }
         
-        print(f"📊 Input features: {input_data}")
+        print(f"Input features: {input_data}")
         
         # Create DataFrame
         df_in = pd.DataFrame([input_data])
         
         # Ambil fitur yang dibutuhkan model
         expected_features = models['feat_dest']
-        print(f"📋 Expected features ({len(expected_features)}): {expected_features}")
+        print(f"Expected features ({len(expected_features)}): {expected_features}")
         
         # Tambahkan fitur yang hilang
         missing_features = [f for f in expected_features if f not in df_in.columns]
@@ -420,7 +420,7 @@ def predict_destination():
                 probabilities = np.ones(len(models['cluster_centroids'])) / len(models['cluster_centroids'])
             
         except Exception as e:
-            print(f"⚠️ LightGBM prediction error: {e}")
+            print(f"LightGBM prediction error: {e}")
             
             # Fallback: probabilities berdasarkan cluster pickup
             probabilities = np.zeros(len(models['cluster_centroids']))
@@ -437,8 +437,8 @@ def predict_destination():
         # Get top 3 predictions
         top_3_indices = np.argsort(probabilities)[-3:][::-1]
         
-        print(f"🏆 Top 3 indices: {top_3_indices}")
-        print(f"📊 Top 3 probabilities: {[probabilities[i] for i in top_3_indices]}")
+        print(f"Top 3 indices: {top_3_indices}")
+        print(f"Top 3 probabilities: {[probabilities[i] for i in top_3_indices]}")
         
         top_3_predictions = []
         for idx in top_3_indices:
@@ -473,7 +473,7 @@ def predict_destination():
             'top_predictions': top_3_predictions
         }
         
-        print(f"✅ Destination prediction successful!")
+        print(f"Destination prediction successful!")
         print(f"   Pickup: Zone {p_cluster} ({pickup_cluster_info['name']})")
         
         return jsonify(response)
@@ -548,15 +548,15 @@ def get_route():
 
 if __name__ == '__main__':
     print("\n" + "="*50)
-    print("🚕 NYC TAXI AI SYSTEM STARTING")
+    print("NYC TAXI AI SYSTEM STARTING")
     print("="*50)
-    print(f"📂 Model path: {MODEL_PATH}")
-    print(f"🔢 Total clusters: {len(models.get('cluster_centroids', []))}")
-    print(f"🧠 Duration model: {'Loaded' if 'xgb_duration' in models else 'Not loaded'}")
-    print(f"🎯 Destination model: {'Loaded' if 'lgb_dest' in models else 'Not loaded'}")
+    print(f"Model path: {MODEL_PATH}")
+    print(f"Total clusters: {len(models.get('cluster_centroids', []))}")
+    print(f"Duration model: {'Loaded' if 'xgb_duration' in models else 'Not loaded'}")
+    print(f"Destination model: {'Loaded' if 'lgb_dest' in models else 'Not loaded'}")
     print("="*50)
-    print("\n🌐 Server running at http://localhost:5000")
-    print("📌 Available routes:")
+    print("\nServer running at http://localhost:5000")
+    print("Available routes:")
     print("   /                   - Home page")
     print("   /duration           - Duration prediction")
     print("   /destination        - Destination prediction")
