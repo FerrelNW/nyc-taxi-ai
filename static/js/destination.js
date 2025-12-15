@@ -239,7 +239,7 @@ function reverseGeocode(lat, lng, inputId) {
         });
 }
 
-// PREDICTION FUNCTION
+// PREDICTION FUNCTION - FIXED TIME CONVERSION
 function predictDestination() {
     const pLat = document.getElementById('pickup_lat').value;
     
@@ -260,24 +260,41 @@ function predictDestination() {
     
     // Konversi select day ke JavaScript day
     let targetJsDay;
-    if (day === 0) targetJsDay = 1;
-    else if (day === 1) targetJsDay = 2;
-    else if (day === 2) targetJsDay = 3;
-    else if (day === 3) targetJsDay = 4;
-    else if (day === 4) targetJsDay = 5;
-    else if (day === 5) targetJsDay = 6;
-    else if (day === 6) targetJsDay = 0;
+    if (day === 0) targetJsDay = 1;      // Monday
+    else if (day === 1) targetJsDay = 2; // Tuesday
+    else if (day === 2) targetJsDay = 3; // Wednesday
+    else if (day === 3) targetJsDay = 4; // Thursday
+    else if (day === 4) targetJsDay = 5; // Friday
+    else if (day === 5) targetJsDay = 6; // Saturday
+    else if (day === 6) targetJsDay = 0; // Sunday
     
     // Hitung selisih hari
     let daysDiff = targetJsDay - currentDay;
     if (daysDiff < 0) daysDiff += 7;
     
-    // Buat tanggal target
+    // Buat tanggal target dengan waktu lokal
     const targetDate = new Date(now);
     targetDate.setDate(now.getDate() + daysDiff);
     targetDate.setHours(hour, minute, 0, 0);
     
-    const datetimeStr = targetDate.toISOString().slice(0, 16);
+    // FORMAT WAKTU LOKAL: YYYY-MM-DDTHH:MM (tanpa konversi UTC)
+    const year = targetDate.getFullYear();
+    const month = String(targetDate.getMonth() + 1).padStart(2, '0');
+    const dayNum = String(targetDate.getDate()).padStart(2, '0');
+    const hourStr = String(hour).padStart(2, '0');
+    const minuteStr = String(minute).padStart(2, '0');
+    
+    const datetimeStr = `${year}-${month}-${dayNum}T${hourStr}:${minuteStr}`;
+    
+    // Debug log
+    console.log('🕒 Time Debug:', {
+        inputHour: hour,
+        inputMinute: minute,
+        inputDay: day,
+        targetDateLocal: targetDate.toString(),
+        datetimeStr: datetimeStr,
+        isoString: targetDate.toISOString() // untuk perbandingan
+    });
 
     // Show loading
     const predictBtn = document.getElementById('predictBtn');
@@ -293,7 +310,7 @@ function predictDestination() {
     const payload = {
         pickup_lat: pLat,
         pickup_lon: document.getElementById('pickup_lon').value,
-        datetime: datetimeStr,
+        datetime: datetimeStr,  // Format: "2024-01-15T21:00"
         passengers: passengers
     };
 
