@@ -277,7 +277,7 @@
             const data = await response.json();
             
             if (data.status === 'success') {
-                clusters = data.clusters; // ✅ SIMPAN DI GLOBAL
+                clusters = data.clusters;
                 displayClusters(clusters);
                 createClusterList(clusters);
                 document.getElementById('clustersCount').textContent = `${clusters.length} zones`;
