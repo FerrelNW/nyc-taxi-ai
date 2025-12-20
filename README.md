@@ -81,7 +81,7 @@ Visualizes **10 Strategic Clusters** generated via K-Means, showing real-time st
 
 1.  **Clone the Repository**
     ```bash
-    git clone [https://github.com/FerrelNW/nyc-taxi-intelligence-system.git](https://github.com/FerrelNW/nyc-taxi-intelligence-system.git)
+    git clone https://github.com/FerrelNW/nyc-taxi-intelligence-system.git
     cd nyc-taxi-intelligence-system
     ```
 
@@ -104,6 +104,7 @@ Visualizes **10 Strategic Clusters** generated via K-Means, showing real-time st
     * `xgb_problem1_final.pkl`
     * `lgbm_destination_prediction.pkl`
     * `cluster_centroids.json`
+    * `cluster_stats.json`
 
 5.  **Run Application**
     ```bash
@@ -112,7 +113,6 @@ Visualizes **10 Strategic Clusters** generated via K-Means, showing real-time st
 
 6.  **Open Browser**
     Go to `http://localhost:5000`
-
 ---
 
 👨‍💻 Author: **Ferrel N W**
