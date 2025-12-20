@@ -81,8 +81,8 @@ Visualizes **10 Strategic Clusters** generated via K-Means, showing real-time st
 
 1.  **Clone the Repository**
     ```bash
-    git clone [https://github.com/FerrelNW/nyc-taxi-ai.git](https://github.com/FerrelNW/nyc-taxi-ai.git)
-    cd nyc-taxi-ai
+    git clone [https://github.com/FerrelNW/nyc-taxi-intelligence-system.git](https://github.com/FerrelNW/nyc-taxi-intelligence-system.git)
+    cd nyc-taxi-intelligence-system
     ```
 
 2.  **Create Virtual Environment**
