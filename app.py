@@ -570,9 +570,8 @@ def get_route():
 
 if __name__ == '__main__':
     print("\n" + "="*50)
-    print("NYC TAXI AI SYSTEM STARTING")
+    print("NYC Taxi Intelligence System STARTING")
     print("="*50)
-    print(f"Model path: {MODEL_PATH}")
     print(f"Total clusters: {len(models.get('cluster_centroids', []))}")
     print(f"Duration model: {'Loaded' if 'xgb_duration' in models else 'Not loaded'}")
     print(f"Destination model: {'Loaded' if 'lgb_dest' in models else 'Not loaded'}")

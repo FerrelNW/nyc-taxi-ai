@@ -31,11 +31,10 @@ function initializeMap() {
     }, 1000);
 }
 
-// MARKER FUNCTIONS - SEDERHANA
+// Marker Function
 function setPickupMarker(lat, lng) {
     if (pickupMarker) map.removeLayer(pickupMarker);
     
-    // MARKER PICKUP SEDERHANA
     pickupMarker = L.marker([lat, lng], {
         icon: L.divIcon({
             className: 'pickup-marker',
@@ -63,17 +62,14 @@ function setPickupMarker(lat, lng) {
         `;
     }
     
-    // Clear previous predictions
     clearPredictions();
     
-    // Center map on pickup
     map.setView([lat, lng], 13);
     
-    // Get zone info
     getZoneInfo(lat, lng);
 }
 
-// Fungsi untuk mendapatkan info zone saat ini
+// Current Zone Info
 function getZoneInfo(lat, lng) {
     fetch('/api/clusters')
         .then(res => res.json())
@@ -137,12 +133,11 @@ function clearPredictions() {
     }
 }
 
-// Buat circle untuk predicted clusters
+// Cluster polygons
 function createPredictedClustersPolygons(clusters) {
     clusters.forEach((cluster, index) => {
         const colors = ['#EF4444', '#3B82F6', '#F59E0B'];
         
-        // Circle sederhana
         const circle = L.circle(cluster.center, {
             radius: 1500,
             color: colors[index],
@@ -155,7 +150,7 @@ function createPredictedClustersPolygons(clusters) {
     });
 }
 
-// SEARCH FUNCTIONALITY
+// Search Location
 function searchLocation(query, resultElementId, inputElementId) {
     if (query.length < 2) {
         document.getElementById(resultElementId).style.display = 'none';
@@ -239,7 +234,7 @@ function reverseGeocode(lat, lng, inputId) {
         });
 }
 
-// PREDICTION FUNCTION - FIXED TIME CONVERSION
+// Predict Destination
 function predictDestination() {
     const pLat = document.getElementById('pickup_lat').value;
     
@@ -254,11 +249,9 @@ function predictDestination() {
     const day = parseInt(daySelect.value);
     const passengers = parseInt(document.getElementById('passengers').value);
     
-    // Buat tanggal dengan hari yang dipilih
     const now = new Date();
     const currentDay = now.getDay();
     
-    // Konversi select day ke JavaScript day
     let targetJsDay;
     if (day === 0) targetJsDay = 1;      // Monday
     else if (day === 1) targetJsDay = 2; // Tuesday
@@ -268,16 +261,13 @@ function predictDestination() {
     else if (day === 5) targetJsDay = 6; // Saturday
     else if (day === 6) targetJsDay = 0; // Sunday
     
-    // Hitung selisih hari
     let daysDiff = targetJsDay - currentDay;
     if (daysDiff < 0) daysDiff += 7;
     
-    // Buat tanggal target dengan waktu lokal
     const targetDate = new Date(now);
     targetDate.setDate(now.getDate() + daysDiff);
     targetDate.setHours(hour, minute, 0, 0);
     
-    // FORMAT WAKTU LOKAL: YYYY-MM-DDTHH:MM (tanpa konversi UTC)
     const year = targetDate.getFullYear();
     const month = String(targetDate.getMonth() + 1).padStart(2, '0');
     const dayNum = String(targetDate.getDate()).padStart(2, '0');
@@ -293,7 +283,7 @@ function predictDestination() {
         inputDay: day,
         targetDateLocal: targetDate.toString(),
         datetimeStr: datetimeStr,
-        isoString: targetDate.toISOString() // untuk perbandingan
+        isoString: targetDate.toISOString()
     });
 
     // Show loading
@@ -355,14 +345,14 @@ function predictDestination() {
     });
 }
 
-// Display prediction results - SEDERHANA
+// Display prediction results
 function displayPredictionResults(data) {
     const predictionsSection = document.getElementById('predictions_section');
     if (!predictionsSection) return;
     
     console.log('📊 Displaying prediction results:', data);
     
-    // Warna ranking
+    // Rank Colours
     const rankColors = ['#EF4444', '#3B82F6', '#F59E0B'];
     const rankIcons = ['fa-trophy', 'fa-medal', 'fa-award'];
     const rankTitles = ['Most Likely', '2nd Most Likely', '3rd Most Likely'];

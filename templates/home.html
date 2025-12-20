@@ -1,18 +1,16 @@
 {% extends "layout.html" %}
 
-{% block title %}Dashboard - NYC Taxi AI{% endblock %}
+{% block title %}Dashboard - NYC Taxi Intelligence System{% endblock %}
 
 {% block content %}
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-    <!-- Header -->
     <div class="text-center mb-12">
         <h1 class="text-4xl font-bold text-gray-800 mb-4">NYC Taxi Intelligence System</h1>
         <p class="text-lg text-gray-600 max-w-3xl mx-auto">
-            Sistem prediksi cerdas untuk taksi New York dengan analisis berbasis Machine Learning
+            Intelligent prediction system for NYC taxis powered by Machine Learning analysis
         </p>
     </div>
 
-    <!-- Stats Overview -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
         <div class="glass-card rounded-xl p-6 shadow-soft hover:shadow-lg transition-all duration-300">
             <div class="flex items-center">
@@ -20,8 +18,8 @@
                     <i class="fas fa-clock text-2xl text-blue-600"></i>
                 </div>
                 <div class="ml-4">
-                    <h3 class="text-lg font-semibold text-gray-800">Estimasi Akurat</h3>
-                    <p class="text-gray-500">Model XGBoost dengan 10 zona</p>
+                    <h3 class="text-lg font-semibold text-gray-800">Precise Estimation</h3>
+                    <p class="text-gray-500">XGBoost model with 10 zones</p>
                 </div>
             </div>
         </div>
@@ -32,8 +30,8 @@
                     <i class="fas fa-map-marked-alt text-2xl text-purple-600"></i>
                 </div>
                 <div class="ml-4">
-                    <h3 class="text-lg font-semibold text-gray-800">Prediksi Tujuan</h3>
-                    <p class="text-gray-500">LightGBM dengan 3 prediksi teratas</p>
+                    <h3 class="text-lg font-semibold text-gray-800">Destination Prediction</h3>
+                    <p class="text-gray-500">LightGBM with top 3 predictions</p>
                 </div>
             </div>
         </div>
@@ -44,47 +42,44 @@
                     <i class="fas fa-layer-group text-2xl text-green-600"></i>
                 </div>
                 <div class="ml-4">
-                    <h3 class="text-lg font-semibold text-gray-800">10 Zona NYC</h3>
+                    <h3 class="text-lg font-semibold text-gray-800">10 NYC Zones</h3>
                     <p class="text-gray-500">K-Means clustering</p>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Main Menu Cards -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <!-- Menu A: Estimasi Durasi -->
         <a href="/duration" class="group">
             <div class="glass-card rounded-2xl p-8 shadow-soft hover:shadow-lg transition-all duration-300 border border-blue-100 hover:border-blue-300 h-full">
                 <div class="flex flex-col items-center text-center">
                     <div class="bg-blue-100 p-4 rounded-2xl mb-6 group-hover:bg-blue-200 transition-colors">
                         <i class="fas fa-clock text-5xl text-blue-600"></i>
                     </div>
-                    <h2 class="text-2xl font-bold text-gray-800 mb-3">Estimasi Durasi Perjalanan</h2>
+                    <h2 class="text-2xl font-bold text-gray-800 mb-3">Trip Duration Estimation</h2>
                     <p class="text-gray-600 mb-6">
-                        Hitung waktu tempuh taksi antara dua lokasi di NYC dengan prediksi akurat berdasarkan kondisi lalu lintas, waktu, dan pola historis.
+                        Calculate taxi travel time between two NYC locations with accurate predictions based on traffic conditions, time, and historical patterns.
                     </p>
                     <div class="flex items-center text-blue-600 font-medium">
-                        <span>Coba Sekarang</span>
+                        <span>Try Now</span>
                         <i class="fas fa-arrow-right ml-2 group-hover:translate-x-1 transition-transform"></i>
                     </div>
                 </div>
             </div>
         </a>
 
-        <!-- Menu B: Analisa Tujuan -->
         <a href="/destination" class="group">
             <div class="glass-card rounded-2xl p-8 shadow-soft hover:shadow-lg transition-all duration-300 border border-purple-100 hover:border-purple-300 h-full">
                 <div class="flex flex-col items-center text-center">
                     <div class="bg-purple-100 p-4 rounded-2xl mb-6 group-hover:bg-purple-200 transition-colors">
                         <i class="fas fa-map-marked-alt text-5xl text-purple-600"></i>
                     </div>
-                    <h2 class="text-2xl font-bold text-gray-800 mb-3">Analisa Pola Tujuan</h3>
+                    <h2 class="text-2xl font-bold text-gray-800 mb-3">Destination Pattern Analysis</h3>
                     <p class="text-gray-600 mb-6">
-                        Prediksi 3 zona tujuan paling mungkin berdasarkan lokasi penjemputan dan waktu. Model LightGBM dengan 10 zona kluster.
+                        Predict the top 3 most likely destination zones based on pickup location and time. LightGBM model with 10 cluster zones.
                     </p>
                     <div class="flex items-center text-purple-600 font-medium">
-                        <span>Analisis Sekarang</span>
+                        <span>Analyze Now</span>
                         <i class="fas fa-arrow-right ml-2 group-hover:translate-x-1 transition-transform"></i>
                     </div>
                 </div>
@@ -92,37 +87,36 @@
         </a>
     </div>
 
-    <!-- How it Works -->
     <div class="mt-16 glass-card rounded-2xl p-8 shadow-soft">
-        <h2 class="text-2xl font-bold text-gray-800 mb-8 text-center">Cara Kerja Sistem</h2>
+        <h2 class="text-2xl font-bold text-gray-800 mb-8 text-center">How the System Works</h2>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div class="text-center">
                 <div class="bg-blue-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4">
                     <i class="fas fa-map-marker-alt text-blue-600 text-lg"></i>
                 </div>
                 <h3 class="font-semibold text-gray-800 mb-2">Input Data</h3>
-                <p class="text-gray-600 text-sm">Masukkan lokasi dan waktu melalui peta interaktif</p>
+                <p class="text-gray-600 text-sm">Enter location and time via the interactive map</p>
             </div>
             <div class="text-center">
                 <div class="bg-green-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4">
                     <i class="fas fa-brain text-green-600 text-lg"></i>
                 </div>
-                <h3 class="font-semibold text-gray-800 mb-2">Proses AI</h3>
-                <p class="text-gray-600 text-sm">Model Machine Learning menganalisis pola dan memprediksi</p>
+                <h3 class="font-semibold text-gray-800 mb-2">AI Processing</h3>
+                <p class="text-gray-600 text-sm">Machine Learning models analyze patterns and predict results</p>
             </div>
             <div class="text-center">
                 <div class="bg-purple-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4">
                     <i class="fas fa-chart-line text-purple-600 text-lg"></i>
                 </div>
-                <h3 class="font-semibold text-gray-800 mb-2">Hasil Visual</h3>
-                <p class="text-gray-600 text-sm">Lihat hasil prediksi dalam peta dan statistik detail</p>
+                <h3 class="font-semibold text-gray-800 mb-2">Visual Results</h3>
+                <p class="text-gray-600 text-sm">View prediction results on maps and detailed statistics</p>
             </div>
         </div>
         
         <div class="mt-8 pt-8 border-t border-gray-200 text-center">
             <a href="/test" class="inline-flex items-center text-gray-600 hover:text-purple-600 font-medium">
                 <i class="fas fa-layer-group mr-2"></i>
-                <span>Lihat Visualisasi 10 Zona Taksi NYC</span>
+                <span>View 10 NYC Taxi Zones Visualization</span>
                 <i class="fas fa-external-link-alt ml-2 text-sm"></i>
             </a>
         </div>

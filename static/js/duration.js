@@ -100,7 +100,7 @@ function initializeMap() {
     });
 }
 
-// MARKER FUNCTIONS
+// Marker Functions
 function setPickupMarker(lat, lng) {
     if (pickupMarker) map.removeLayer(pickupMarker);
     
@@ -169,7 +169,7 @@ function setDropoffMarker(lat, lng) {
     }
 }
 
-// SEARCH FUNCTIONALITY
+// Search Location  
 function searchLocation(query, resultElementId, inputElementId, markerFunction) {
     if (currentSearch === query) return;
     
@@ -262,7 +262,7 @@ function reverseGeocode(lat, lng, inputId) {
         .catch(err => console.error('Reverse geocode error:', err));
 }
 
-// ROUTE DRAWING
+// Route Drawing
 function drawRouteIfComplete() {
     if (pickupLat && pickupLon && dropoffLat && dropoffLon) {
         drawRoute();
@@ -306,7 +306,7 @@ function drawRoute() {
             console.error('Route drawing error:', err);
         });
 }
-// SWAP LOCATIONS
+// Swap Locations
 function swapLocations() {
     if (!pickupLat || !dropoffLat) {
         showNotification('Please select both pickup and dropoff locations first!', 'error');
@@ -335,7 +335,7 @@ function swapLocations() {
     showNotification('Locations swapped successfully!', 'success');
 }
 
-// CLEAR MAP
+// Clear Map
 function clearMap() {
     if (pickupMarker) { 
         map.removeLayer(pickupMarker); 
@@ -390,7 +390,7 @@ function clearMap() {
     showNotification('Map cleared!', 'success');
 }
 
-// PREDICT DURATION FUNCTION
+// Predict Duration
 function predictDuration() {
     // 1. Validate Input
     if (!pickupLat || !pickupLon) {
@@ -484,7 +484,7 @@ function predictDuration() {
     });
 }
 
-// DISPLAY PREDICTION RESULTS - SIMPLIFIED VERSION
+// Display Prediction Results
 function displayPredictionResults(data, hour, minute, dayName) {
     const resultContainer = document.getElementById('predictionResults');
     if (!resultContainer) return;
@@ -505,7 +505,7 @@ function displayPredictionResults(data, hour, minute, dayName) {
         durationDisplay = `${totalMinutes} minute${totalMinutes > 1 ? 's' : ''}`;
     }
 
-    // Determine traffic condition based on your notebook (8-10 & 15-18)
+    // Traffic Condition
     let isRushHour = false;
     let trafficCondition = '';
     let trafficColor = '';
