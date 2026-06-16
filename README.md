@@ -45,7 +45,7 @@ Uses **LightGBM Classifier** to predict the top 3 most likely drop-off zones, he
 <br>
 
 ### 4. Interactive Zone Visualization
-Visualizes **10 Strategic Clusters** generated via K-Means, showing real-time statistics like average speed and passenger volume per zone.
+Visualizes **10 Strategic Clusters** generated via K-Means, showing statistics like average speed and passenger volume per zone.
 ![Cluster](images/cluster%20visualization.png)
 
 ---
